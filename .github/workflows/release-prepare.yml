@@ -50,6 +50,12 @@ jobs:
           else
             level="none"
           fi
+          # --major overrides major_on_zero, so a breaking change during 0.x
+          # asks for a minor bump here.
+          version="$(python3 -c "import tomllib; print(tomllib.load(open('pyproject.toml','rb'))['project']['version'])")"
+          if [[ "$level" == "major" && "$version" == 0.* ]]; then
+            level="minor"
+          fi
           echo "level=$level" >> "$GITHUB_OUTPUT"
           echo "PR title '$PR_TITLE' -> bump level: $level"
 
