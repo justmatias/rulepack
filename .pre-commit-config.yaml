@@ -1,0 +1,74 @@
+# `pre-commit install` installs both the pre-commit and the commit-msg hooks. Hooks
+# run at the pre-commit stage unless they say otherwise.
+default_install_hook_types: [pre-commit, commit-msg]
+default_stages: [pre-commit]
+
+repos:
+  - repo: https://github.com/abravalheri/validate-pyproject
+    rev: 'v0.27'
+    hooks:
+      - id: validate-pyproject
+
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v6.0.0
+    hooks:
+      - id: trailing-whitespace
+      - id: end-of-file-fixer
+      - id: check-yaml
+      - id: detect-private-key
+      # Branch first. CI skips it on main pushes.
+      - id: no-commit-to-branch
+        args: [--branch, main]
+
+  - repo: https://github.com/gitleaks/gitleaks
+    rev: v8.30.0
+    hooks:
+      - id: gitleaks
+
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: 'v0.17.5'
+    hooks:
+      - id: ruff-check
+        name: ruff
+        args: ['--fix']
+      - id: ruff-format
+
+  - repo: https://github.com/PyCQA/bandit
+    rev: 1.9.4
+    hooks:
+      - id: bandit
+        args: ['-r', '-lll']
+
+  - repo: https://github.com/rhysd/actionlint
+    rev: v1.7.12
+    hooks:
+      - id: actionlint
+
+  - repo: https://github.com/justmatias/hookpin
+    rev: v7.0.2
+    hooks:
+      - id: hookpin
+
+  - repo: https://github.com/pylint-dev/pylint
+    rev: v4.1.4
+    hooks:
+      - id: pylint
+        types: [python]
+        additional_dependencies:
+          - pytest==9.2.0
+
+  - repo: https://github.com/pre-commit/mirrors-mypy
+    rev: v2.4.1
+    hooks:
+      - id: mypy
+        additional_dependencies:
+          - pytest==9.2.0
+
+  # The rule checks from mstack's published hooks, until rulepack can lint itself.
+  # The packs come from .mstack.toml.
+  - repo: https://github.com/justmatias/mstack
+    rev: v6.7.1
+    hooks:
+      - id: mstack-lint
+      - id: mstack-exceptions
+      - id: mstack-commit-msg

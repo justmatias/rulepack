@@ -1,0 +1,18 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+build/
+dist/
+
+# Tooling
+.import_linter_cache/
+.coverage
+htmlcov/
+
+# Local agent settings
+.claude/settings.local.json

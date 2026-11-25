@@ -1,0 +1,145 @@
+[project]
+name = "rulepack"
+version = "0.0.0"
+description = "Run ast-grep and import-linter checks from shared, versioned rule packs in any repo."
+readme = "README.md"
+license = { text = "MIT" }
+authors = [
+  { name = "Matias Gimenez", email = "matiasgimenez.dev@gmail.com" },
+]
+requires-python = ">=3.12"
+dependencies = []
+
+[project.scripts]
+rulepack = "rulepack.cli:main"
+
+[project.urls]
+repository = "https://github.com/justmatias/rulepack"
+
+[dependency-groups]
+dev = [
+    "pre-commit>=4",
+    "pytest",
+]
+
+[build-system]
+requires = ["hatchling>=1.27,<2"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/rulepack"]
+
+[tool.hatch.build.targets.sdist]
+include = [
+    "/src/rulepack",
+    "/LICENSE",
+    "/README.md",
+    "/pyproject.toml",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+##################################
+# ruff configuration             #
+##################################
+
+[tool.ruff]
+line-length = 88
+preview = true
+fix = true
+# T20: no print() left in code; use logging.
+lint.extend-select = ["T20"]
+format.indent-style = "space"
+format.quote-style = "double"
+format.line-ending = "auto"
+format.skip-magic-trailing-comma = false
+
+##################################
+# pylint configuration           #
+##################################
+
+[tool.pylint]
+disable = [
+  "missing-docstring",
+  "missing-module-docstring",
+  "missing-function-docstring",
+  "too-few-public-methods",
+  "astroid-error",
+  "consider-using-assignment-expr",
+  "redefined-outer-name",
+  "broad-exception-caught",
+  "import-error",
+]
+
+load-plugins = [
+  "pylint.extensions.bad_builtin",
+  "pylint.extensions.code_style",
+  "pylint.extensions.comparison_placement",
+  "pylint.extensions.consider_refactoring_into_while_condition",
+  "pylint.extensions.dunder",
+  "pylint.extensions.eq_without_hash",
+  "pylint.extensions.for_any_all",
+  "pylint.extensions.mccabe",
+  "pylint.extensions.no_self_use",
+  "pylint.extensions.overlapping_exceptions",
+  "pylint.extensions.private_import",
+  "pylint.extensions.redefined_loop_name",
+  "pylint.extensions.set_membership",
+]
+
+##################################
+# mypy configuration             #
+##################################
+
+[tool.mypy]
+python_version = "3.12"
+disallow_untyped_defs = true
+show_error_codes = true
+no_implicit_optional = true
+warn_return_any = true
+warn_unused_ignores = true
+disable_error_code = ["var-annotated"]
+
+# Tests take pytest fixtures as parameters; annotating each one adds noise.
+[[tool.mypy.overrides]]
+module = ["tests.*"]
+disallow_untyped_defs = false
+warn_return_any = false
+
+##################################
+# semantic release configuration #
+##################################
+
+[tool.semantic_release]
+branch = "main"
+commit_message = "chore(release): release version {version}"
+major_on_zero = false
+version_toml = ["pyproject.toml:project.version"]
+# The install commands in README.md pin `rulepack@v<version>`.
+version_variables = ["README.md:rulepack:tf"]
+build_command = "uv lock --upgrade-package rulepack && git add uv.lock"
+
+[tool.semantic_release.branches.main]
+match = "(main|master)"
+prerelease_token = "rc"
+prerelease = false
+
+[tool.semantic_release.changelog.default_templates]
+changelog_file = "CHANGELOG.md"
+
+[tool.semantic_release.commit_author]
+env = "GIT_COMMIT_AUTHOR"
+default = "semantic-release <semantic-release>"
+
+[tool.semantic_release.commit_parser_options]
+allowed_tags = ["build", "chore", "ci", "docs", "feat", "fix", "perf", "refactor", "style", "test"]
+minor_tags = ["feat"]
+patch_tags = ["fix", "perf"]
+default_bump_level = 0
+
+[tool.semantic_release.remote]
+name = "origin"
+type = "github"
+ignore_token_for_push = false
+insecure = false
