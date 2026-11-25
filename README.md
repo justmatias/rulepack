@@ -51,7 +51,20 @@ GitHub settings, applied with `gh`:
     -F delete_branch_on_merge=true
   ```
 
-- **A `main` ruleset**: no deletion, no force push, and changes only through a pull request merged with squash.
+- **A `main` ruleset**: no deletion, no force push, and changes only through a pull request merged with squash:
+
+  ```bash
+  gh api -X POST repos/justmatias/rulepack/rulesets --input - <<'EOF'
+  {"name": "main", "target": "branch", "enforcement": "active",
+   "conditions": {"ref_name": {"include": ["refs/heads/main"], "exclude": []}},
+   "rules": [{"type": "deletion"}, {"type": "non_fast_forward"},
+     {"type": "pull_request", "parameters": {"allowed_merge_methods": ["squash"],
+       "required_approving_review_count": 0, "dismiss_stale_reviews_on_push": false,
+       "require_code_owner_review": false, "require_last_push_approval": false,
+       "required_review_thread_resolution": false}}]}
+  EOF
+  ```
+
 - **A `GH_TOKEN` secret**: a fine-grained token with contents write access on this repo only. `release-prepare.yml` and `pre-commit-autoupdate.yml` push with it, because a push made with `GITHUB_TOKEN` does not start CI on the pushed commit.
 
 ## License
