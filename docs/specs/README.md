@@ -2,7 +2,12 @@
 
 Implementation plans for rulepack. Each spec says what it depends on, what it changes, how it is tested and when it is done. When a spec ships, delete it in the same PR (git history keeps it) and remove its row here.
 
-The move of the linter out of mstack is planned in mstack's specs: [pack-sources](https://github.com/justmatias/mstack/blob/main/docs/specs/pack-sources.md), [rulepack-extraction](https://github.com/justmatias/mstack/blob/main/docs/specs/rulepack-extraction.md) and [mstack-uses-rulepack](https://github.com/justmatias/mstack/blob/main/docs/specs/mstack-uses-rulepack.md). Features after the extraction are specced here.
+## Next
+
+| Spec | Summary | Depends on |
+| --- | --- | --- |
+| [migrate-from-mstack](migrate-from-mstack.md) | Move all enforcement code from mstack, without packs, in parallel with mstack's [cleanup](https://github.com/justmatias/mstack/blob/main/docs/specs/mstack-uses-rulepack.md) | bootstrap |
+| [pack-sources](pack-sources.md) | Run checks from one or more git or path sources, pinned by a lockfile | migrate-from-mstack, mstack's cleanup |
 
 ## Writing a spec
 
