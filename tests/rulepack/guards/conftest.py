@@ -28,15 +28,3 @@ def shell_exception_file(tmp_path: Path):
         return path
 
     return write
-
-
-@pytest.fixture
-def commit_message(git_repository: Path, run_rulepack):
-    """Run rulepack commit-msg on a message, inside a repo with its own config."""
-
-    def check(message: str):
-        path = git_repository / "COMMIT_EDITMSG"
-        path.write_text(message, encoding="utf-8")
-        return run_rulepack("commit-msg", str(path), working_directory=git_repository)
-
-    return check

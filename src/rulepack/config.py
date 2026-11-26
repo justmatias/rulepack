@@ -44,22 +44,6 @@ class ChangedSettings(StrictModel):
     base_ref: str = "origin/main"
 
 
-class CommitsSettings(StrictModel):
-    # The Conventional Commits types `rulepack commit-msg` accepts.
-    types: list[str] = [
-        "build",
-        "chore",
-        "ci",
-        "docs",
-        "feat",
-        "fix",
-        "perf",
-        "refactor",
-        "style",
-        "test",
-    ]
-
-
 class HookSettings(StrictModel):
     enabled: bool = True
     timeout: float = Field(default=10.0, gt=0, allow_inf_nan=False)
@@ -74,7 +58,6 @@ class ProjectConfig(StrictModel):
     hooks: HookSettings = HookSettings()
     domain_check: DomainCheckSettings = DomainCheckSettings()
     changed: ChangedSettings = ChangedSettings()
-    commits: CommitsSettings = CommitsSettings()
 
 
 class ResolvedConfig(StrictModel):

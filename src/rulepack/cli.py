@@ -6,7 +6,6 @@ import sys
 logger = logging.getLogger(__name__)
 
 COMMANDS = {
-    "commit-msg": "rulepack.commit_msg",
     "config": "rulepack.config",
     "exceptions": "rulepack.exceptions",
 }

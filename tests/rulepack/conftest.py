@@ -4,7 +4,6 @@ from pathlib import Path
 import pytest
 
 from tests.helpers import run_command
-from tests.rulepack.helpers import git
 
 
 @pytest.fixture
@@ -37,12 +36,3 @@ def write_config(git_repository: Path):
         return path
 
     return write
-
-
-@pytest.fixture
-def commit():
-    def run(repository: Path, message: str = "change") -> None:
-        git(repository, "add", "--all")
-        git(repository, "commit", "--quiet", "-m", message)
-
-    return run
