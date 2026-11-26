@@ -19,7 +19,7 @@ All of the enforcement logic lives in mstack's `src/mstack/`: the ast-grep scan,
 
 ## Design
 
-**What moves.** Paths are under `src/mstack/` in mstack and under `src/rulepack/` here.
+**What moves.** Paths are under `src/mstack/` in mstack and under `rulepack/` here.
 
 | From mstack | Here | Command |
 | --- | --- | --- |
@@ -29,7 +29,6 @@ All of the enforcement logic lives in mstack's `src/mstack/`: the ast-grep scan,
 | `init.py`, `templates/`, without the `packs` line | same | `rulepack init` |
 | `hooks.py` | same | `rulepack hook post-edit`, `rulepack hook stop` |
 | `guards/check_exceptions.py` | `exceptions.py` | `rulepack exceptions` |
-| `guards/check_commit_msg.py` | `commit_msg.py` | `rulepack commit-msg` |
 | `guards/check_rule_coverage.py`, without `pack_coverage` | `coverage.py` | `rulepack coverage` |
 | `guards/check_domain.py`, `generic_names.txt` | `domain_check.py`, same | `rulepack domain-check` |
 | `guards/credit.py`, `render.split_frontmatter` | `credit.py`, `frontmatter.py` | |
@@ -38,13 +37,13 @@ All of the enforcement logic lives in mstack's `src/mstack/`: the ast-grep scan,
 
 **Prose is in scope.** `coverage` reads each prose rule's frontmatter (`enforced-by`, `globs`, credit) to prove that rules and checks point to each other. So rulepack reads `.mdc` frontmatter. It never renders or installs prose; that stays in mstack. `split_frontmatter` and `credit_problems` exist in both repos, about 40 lines each side. A shared library for that much code would be a third package to release.
 
-**Config.** `.rulepack.toml` has the same keys as `.mstack.toml` today, minus the pack keys: `rules_dir`, `sgconfig`, `importlinter`, `pre_commit_config`, `[scan]`, `[hooks]`, `[domain_check]`, `[changed]`, `[commits]`. The lookup and precedence rules are the same: defaults, then the file, then flags. `rulepack` ignores `.mstack.toml`. A repo that still has one with lint keys gets an error that tells it to rename the file.
+**Config.** `.rulepack.toml` has the same keys as `.mstack.toml` today, minus the pack keys: `rules_dir`, `sgconfig`, `importlinter`, `pre_commit_config`, `[scan]`, `[hooks]`, `[domain_check]`, `[changed]`. `[commits]` stays in mstack with its commit-message check. The lookup and precedence rules are the same: defaults, then the file, then flags. `rulepack` ignores `.mstack.toml`. A repo that still has one with lint keys gets an error that tells it to rename the file.
 
 **Agent hooks** run in repos with `.rulepack.toml`, where they previously needed `.mstack.toml`.
 
 **History.** Run `git filter-repo` over a clone of mstack, keeping only the moved paths, then merge into `main` with `--allow-unrelated-histories`. The package and import rename (`mstack` → `rulepack`) is one commit on top, and the removal of the pack code is another. This keeps blame readable and the deleted code visible in the history.
 
-**Dogfooding.** Until [pack-sources](pack-sources.md) ships, this repo cannot load mstack's checks from a source. It keeps the bootstrap's pinned mstack `v6.7.1` hooks for its own Python checks; that tag still ships bundled packs. Copying the checks here would be exactly the drift packs exist to prevent. `commit-msg` switches now to the local `rulepack commit-msg`, both in the commit-msg hook and in CI's per-commit check.
+**Dogfooding.** Until [pack-sources](pack-sources.md) ships, this repo cannot load mstack's checks from a source. It keeps the bootstrap's pinned mstack `v6.7.1` hooks for its own Python checks; that tag still ships bundled packs. Copying the checks here would be exactly the drift packs exist to prevent. Commit messages stay on mstack's `commit-msg` hook: rulepack does not reimplement it.
 
 **CI.** Add these jobs and steps to the bootstrap's CI:
 - `action-self-test`, running `./` on a fixture repo.
@@ -62,14 +61,13 @@ All of the enforcement logic lives in mstack's `src/mstack/`: the ast-grep scan,
 
 ## Changes
 
-- `src/rulepack/`: the modules above. `cli.py` gets the full command table, replacing the bootstrap's stub.
+- `rulepack/`: the modules above. `cli.py` gets the full command table, replacing the bootstrap's stub.
 - `tests/`, including `tests/fixtures/` (valid and invalid samples).
 - `pyproject.toml`:
   - runtime dependencies: `ast-grep-cli` (pinned to a minor range), `import-linter`, `pydantic`, `pyyaml`
   - the `slow` marker, and `fixtures/` excludes for ruff, pylint and mypy
 - `uv.lock`, and the pylint and mypy `additional_dependencies` in `.pre-commit-config.yaml`.
 - `action.yml`, `.pre-commit-hooks.yaml`, `.github/workflows/ci.yml`.
-- `.pre-commit-config.yaml`: a local `rulepack commit-msg` hook replaces `mstack-commit-msg`.
 - `README.md`: usage (`init`, `lint`, config keys, CI, the Action, pre-commit, agent hooks). The status line now says "no shared packs yet".
 
 ## Tests
@@ -89,7 +87,7 @@ All of the enforcement logic lives in mstack's `src/mstack/`: the ast-grep scan,
 ## Acceptance criteria
 
 - [ ] `v0.1.0` is tagged. `uvx --from git+https://github.com/justmatias/rulepack@v0.1.0 rulepack lint` gives the same findings on mstack as `mstack lint` did.
-- [ ] `git log --follow src/rulepack/lint.py` reaches the file's history in mstack.
+- [ ] `git log --follow rulepack/lint.py` reaches the file's history in mstack.
 - [ ] No code here refers to packs.
 - [ ] mstack's cleanup PR merges on `v0.1.0`.
 
