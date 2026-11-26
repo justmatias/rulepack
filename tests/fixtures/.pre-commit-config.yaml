@@ -1,5 +1,4 @@
-# The sample repo's .pre-commit-config.yaml: one remote and one local hook, for
-# `enforced-by-hook:` in coverage.
+# The sample repo's .pre-commit-config.yaml: one remote and one local hook.
 repos:
   - repo: https://github.com/gitleaks/gitleaks
     rev: v8.30.0

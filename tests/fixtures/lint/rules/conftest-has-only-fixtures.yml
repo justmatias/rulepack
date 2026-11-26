@@ -6,8 +6,6 @@ note: |
   pytest loads conftest.py for its fixtures and hooks. A plain helper there is
   imported from a file whose job is setup, so readers cannot tell which names
   are fixtures; a helpers.py next to it makes the split visible.
-metadata:
-  source: rules/pytest-fixtures.mdc
 files:
   - "**/conftest.py"
 rule:
