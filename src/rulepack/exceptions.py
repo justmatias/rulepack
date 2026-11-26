@@ -11,6 +11,8 @@ import sys
 import tokenize
 from pathlib import Path
 
+from pydantic import BaseModel
+
 from rulepack.config import resolve_config
 
 logger = logging.getLogger(__name__)
@@ -20,6 +22,24 @@ EXCEPTION_COMMENT = re.compile(r"^#\s*rule-exception:\s*(?P<fields>.*)$")
 REQUIRED_FIELDS = ("reason", "expires", "approved-by")
 # Files whose `#` comments may carry an ast-grep-ignore.
 SUFFIXES = (".py", ".sh")
+
+
+class InvalidExceptionError(ValueError):
+    pass
+
+
+class RuleException(BaseModel):
+    rule: str
+    file: str
+    line: int
+    reason: str
+    expires: str
+    approved_by: str
+
+
+class ExceptionScan(BaseModel):
+    exceptions: list[RuleException] = []
+    problems: list[str] = []
 
 
 def is_excluded(path: Path, root: Path, exclude_globs: list[str]) -> bool:
@@ -95,27 +115,32 @@ def parse_exception_fields(text: str) -> dict[str, str]:
     return fields
 
 
-def validate_exception_fields(
+def parse_valid_exception_fields(
     location: str, fields_text: str, today: datetime.date
-) -> tuple[dict[str, str], str | None]:
+) -> dict[str, str]:
+    """Parse a rule-exception's fields; raise InvalidExceptionError if they are invalid."""
     try:
         fields = parse_exception_fields(fields_text)
     except ValueError as error:
-        return {}, f"{location}: malformed rule-exception ({error})"
+        raise InvalidExceptionError(
+            f"{location}: malformed rule-exception ({error})"
+        ) from error
     missing = [field for field in REQUIRED_FIELDS if not fields.get(field)]
     if missing:
-        return fields, f"{location}: rule-exception is missing {', '.join(missing)}"
+        raise InvalidExceptionError(
+            f"{location}: rule-exception is missing {', '.join(missing)}"
+        )
     try:
         expires = datetime.date.fromisoformat(fields["expires"])
-    except ValueError:
-        return fields, (
+    except ValueError as error:
+        raise InvalidExceptionError(
             f"{location}: expires={fields['expires']} is not a YYYY-MM-DD date"
-        )
+        ) from error
     if expires < today:
-        return fields, f"{location}: rule-exception expired on {expires}"
+        raise InvalidExceptionError(f"{location}: rule-exception expired on {expires}")
     if not fields["approved-by"].startswith("@"):
-        return fields, f"{location}: approved-by must be a @handle"
-    return fields, None
+        raise InvalidExceptionError(f"{location}: approved-by must be a @handle")
+    return fields
 
 
 def ignored_rule_ids(rule_ids_text: str | None) -> list[str]:
@@ -132,9 +157,8 @@ def missing_exception_problem(location: str, line: str) -> str:
     return f"{location}: 'ast-grep-ignore' needs a '# rule-exception:' on {where}"
 
 
-def file_exceptions(path: Path, today: datetime.date) -> tuple[list[dict], list[str]]:
-    exceptions: list[dict] = []
-    problems: list[str] = []
+def scan_file_exceptions(path: Path, today: datetime.date) -> ExceptionScan:
+    scan = ExceptionScan()
     source = path.read_text(encoding="utf-8")
     comments = (
         shell_comments_by_line(source)
@@ -149,43 +173,43 @@ def file_exceptions(path: Path, today: datetime.date) -> tuple[list[dict], list[
         location = f"{path}:{line_number}"
         rule_ids = ignored_rule_ids(ignore["rule_ids"])
         if not rule_ids:
-            problems.append(
+            scan.problems.append(
                 f"{location}: 'ast-grep-ignore' must name the rule ids it suppresses"
             )
         exception = EXCEPTION_COMMENT.match(comments.get(line_number - 1, ""))
         if not exception:
-            problems.append(missing_exception_problem(location, lines[line_number - 1]))
+            scan.problems.append(
+                missing_exception_problem(location, lines[line_number - 1])
+            )
             continue
-        fields, problem = validate_exception_fields(
-            f"{path}:{line_number - 1}", exception["fields"], today
-        )
-        if problem:
-            problems.append(problem)
+        try:
+            fields = parse_valid_exception_fields(
+                f"{path}:{line_number - 1}", exception["fields"], today
+            )
+        except InvalidExceptionError as error:
+            scan.problems.append(str(error))
             continue
-        exceptions.extend(
-            {
-                "rule": rule_id,
-                "file": str(path),
-                "line": line_number,
-                "reason": fields["reason"],
-                "expires": fields["expires"],
-                "approved_by": fields["approved-by"],
-            }
+        scan.exceptions.extend(
+            RuleException(
+                rule=rule_id,
+                file=str(path),
+                line=line_number,
+                reason=fields["reason"],
+                expires=fields["expires"],
+                approved_by=fields["approved-by"],
+            )
             for rule_id in rule_ids
         )
-    return exceptions, problems
+    return scan
 
 
-def collect_exceptions(
-    files: list[Path], today: datetime.date
-) -> tuple[list[dict], list[str]]:
-    exceptions: list[dict] = []
-    problems: list[str] = []
+def collect_exceptions(files: list[Path], today: datetime.date) -> ExceptionScan:
+    scan = ExceptionScan()
     for path in files:
-        found, invalid = file_exceptions(path, today)
-        exceptions.extend(found)
-        problems.extend(invalid)
-    return exceptions, problems
+        file_scan = scan_file_exceptions(path, today)
+        scan.exceptions.extend(file_scan.exceptions)
+        scan.problems.extend(file_scan.problems)
+    return scan
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -211,17 +235,14 @@ def main(argv: list[str] | None = None) -> int:
     arguments = parser.parse_args(argv)
     config = resolve_config()
 
-    exceptions, problems = collect_exceptions(
+    scan = collect_exceptions(
         source_files(arguments.paths, config.root, config.values.scan.exclude),
         arguments.today,
     )
     if arguments.json:
-        sys.stdout.write(
-            json.dumps({"exceptions": exceptions, "problems": problems}, indent=2)
-            + "\n"
-        )
-    for problem in problems:
+        sys.stdout.write(json.dumps(scan.model_dump(), indent=2) + "\n")
+    for problem in scan.problems:
         logger.error("%s", problem)
-    if not problems and not arguments.json:
-        logger.info("exceptions: OK (%d active exceptions)", len(exceptions))
-    return 1 if problems else 0
+    if not scan.problems and not arguments.json:
+        logger.info("exceptions: OK (%d active exceptions)", len(scan.exceptions))
+    return 1 if scan.problems else 0
