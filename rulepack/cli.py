@@ -7,7 +7,6 @@ logger = logging.getLogger(__name__)
 
 COMMANDS = {
     "config": "rulepack.config",
-    "exceptions": "rulepack.exceptions",
 }
 
 
