@@ -1,19 +1,39 @@
 import argparse
-from importlib import metadata
+import importlib
+import logging
+import sys
+
+logger = logging.getLogger(__name__)
+
+COMMANDS = {
+    "commit-msg": "rulepack.commit_msg",
+    "config": "rulepack.config",
+    "exceptions": "rulepack.exceptions",
+}
 
 
 def main(argv: list[str] | None = None) -> int:
+    arguments = sys.argv[1:] if argv is None else argv
+    logging.basicConfig(level=logging.INFO, format="%(message)s")
+    metadata = importlib.import_module("importlib.metadata")
     parser = argparse.ArgumentParser(
         prog="rulepack",
         description=(
             "Run ast-grep and import-linter checks from shared, versioned rule packs."
         ),
+        epilog="Run 'rulepack <command> --help' for what each command does.",
     )
     parser.add_argument(
         "--version",
         action="version",
         version=f"rulepack {metadata.version('rulepack')}",
     )
-    parser.parse_args(argv)
-    parser.print_help()
-    return 0
+    parser.add_argument("command", choices=COMMANDS)
+    parsed = parser.parse_args(arguments[:1])
+    command = importlib.import_module(COMMANDS[parsed.command])
+    config = importlib.import_module("rulepack.config")
+    try:
+        return int(command.main(arguments[1:]))
+    except config.ConfigError as error:
+        logger.error("rulepack: %s", error)
+        return 2
