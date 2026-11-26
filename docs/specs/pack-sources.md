@@ -71,7 +71,7 @@ A source has exactly one of `git` or `path`, and packs are always selected as `<
 
 ## Changes
 
-- `src/rulepack/packs.py`: manifest and source models, path containment, resolution, cache, lock read and write, and the `lock`, `update` and `list` subcommands.
+- `rulepack/packs.py`: manifest and source models, path containment, resolution, cache, lock read and write, and the `lock`, `update` and `list` subcommands.
 - `config.py`: `packs`, `sources`, `[pack_overrides]`, host config.
 - `lint.py`: pack checks and pack rule tests next to local ones, a temporary sgconfig, overrides, and the clash rules.
 - `hooks.py`: skip uncached sources.

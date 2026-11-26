@@ -34,11 +34,11 @@ requires = ["hatchling>=1.27,<2"]
 build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
-packages = ["src/rulepack"]
+packages = ["rulepack"]
 
 [tool.hatch.build.targets.sdist]
 include = [
-    "/src/rulepack",
+    "/rulepack",
     "/LICENSE",
     "/README.md",
     "/pyproject.toml",

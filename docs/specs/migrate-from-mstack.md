@@ -19,7 +19,7 @@ All of the enforcement logic lives in mstack's `src/mstack/`: the ast-grep scan,
 
 ## Design
 
-**What moves.** Paths are under `src/mstack/` in mstack and under `src/rulepack/` here.
+**What moves.** Paths are under `src/mstack/` in mstack and under `rulepack/` here.
 
 | From mstack | Here | Command |
 | --- | --- | --- |
@@ -61,7 +61,7 @@ All of the enforcement logic lives in mstack's `src/mstack/`: the ast-grep scan,
 
 ## Changes
 
-- `src/rulepack/`: the modules above. `cli.py` gets the full command table, replacing the bootstrap's stub.
+- `rulepack/`: the modules above. `cli.py` gets the full command table, replacing the bootstrap's stub.
 - `tests/`, including `tests/fixtures/` (valid and invalid samples).
 - `pyproject.toml`:
   - runtime dependencies: `ast-grep-cli` (pinned to a minor range), `import-linter`, `pydantic`, `pyyaml`
@@ -87,7 +87,7 @@ All of the enforcement logic lives in mstack's `src/mstack/`: the ast-grep scan,
 ## Acceptance criteria
 
 - [ ] `v0.1.0` is tagged. `uvx --from git+https://github.com/justmatias/rulepack@v0.1.0 rulepack lint` gives the same findings on mstack as `mstack lint` did.
-- [ ] `git log --follow src/rulepack/lint.py` reaches the file's history in mstack.
+- [ ] `git log --follow rulepack/lint.py` reaches the file's history in mstack.
 - [ ] No code here refers to packs.
 - [ ] mstack's cleanup PR merges on `v0.1.0`.
 
