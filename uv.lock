@@ -518,8 +518,8 @@ dev = [
 
 [package.metadata]
 requires-dist = [
-    { name = "ast-grep-cli", specifier = ">=0.51,<0.52" },
-    { name = "import-linter", specifier = ">=2.17,<3" },
+    { name = "ast-grep-cli", specifier = ">=0.51" },
+    { name = "import-linter", specifier = ">=2.17" },
     { name = "pydantic", specifier = ">=2" },
     { name = "pyyaml", specifier = ">=6" },
 ]
