@@ -9,17 +9,16 @@ import sys
 import sysconfig
 from collections.abc import Callable
 from pathlib import Path
-from typing import Any, Literal
+from typing import Literal
 
 import yaml
 from pydantic import Field
 
 from rulepack.config import ConfigError, ResolvedConfig, StrictModel, resolve_config
-from rulepack.lint.changed_files import ChangedFilesError, changed_files
+from rulepack.lint.changed_files import ChangedFilesError, list_changed_files
 
 logger = logging.getLogger(__name__)
 
-STEPS = ("test", "scan", "imports")
 Mode = Literal["full", "changed", "files"]
 
 
@@ -27,10 +26,18 @@ class LintError(Exception):
     pass
 
 
+class ScanFinding(StrictModel):
+    file: str | None
+    line: int
+    rule: str | None
+    severity: str | None
+    message: str | None
+
+
 class StepResult(StrictModel):
     ok: bool
     skipped: str | None = None
-    findings: list[Any] = Field(default_factory=list)
+    findings: list[ScanFinding | str] = Field(default_factory=list)
 
 
 class LintRun(StrictModel):
@@ -58,7 +65,7 @@ def find_tool(name: str) -> str:
 
 
 def run_tool(
-    command: list[str], run: LintRun, env: dict[str, str] | None = None
+    command: list[str], run: LintRun, environment: dict[str, str] | None = None
 ) -> subprocess.CompletedProcess:
     logger.debug("lint: %s", " ".join(command))
     return subprocess.run(
@@ -69,11 +76,11 @@ def run_tool(
         encoding="utf-8",
         errors="replace",
         check=False,
-        env=env,
+        env=environment,
     )
 
 
-def output_lines(completed: subprocess.CompletedProcess) -> list[str]:
+def collect_output_lines(completed: subprocess.CompletedProcess) -> list[str]:
     return [
         line
         for line in f"{completed.stdout or ''}{completed.stderr or ''}".splitlines()
@@ -81,12 +88,12 @@ def output_lines(completed: subprocess.CompletedProcess) -> list[str]:
     ]
 
 
-def tool_result(completed: subprocess.CompletedProcess) -> StepResult:
+def build_step_result(completed: subprocess.CompletedProcess) -> StepResult:
     ok = completed.returncode == 0
-    return StepResult(ok=ok, findings=[] if ok else output_lines(completed))
+    return StepResult(ok=ok, findings=[] if ok else [*collect_output_lines(completed)])
 
 
-def sgconfig_path(run: LintRun) -> Path:
+def require_sgconfig(run: LintRun) -> Path:
     path = run.config.values.sgconfig
     if not path.is_file():
         raise LintError(
@@ -109,26 +116,26 @@ def has_rule_tests(sgconfig: Path) -> bool:
     )
 
 
-def step_test(run: LintRun) -> StepResult:
-    sgconfig = sgconfig_path(run)
+def run_test_step(run: LintRun) -> StepResult:
+    sgconfig = require_sgconfig(run)
     if not has_rule_tests(sgconfig):
         return StepResult(ok=True, skipped="the sgconfig has no rule tests")
     command = [find_tool("ast-grep"), "test", "-c", str(sgconfig)]
-    return tool_result(run_tool([*command, "--skip-snapshot-tests"], run))
+    return build_step_result(run_tool([*command, "--skip-snapshot-tests"], run))
 
 
-def scan_finding(line: str) -> dict[str, Any]:
+def parse_scan_finding(line: str) -> ScanFinding:
     match = json.loads(line)
-    return {
-        "file": match.get("file"),
-        "line": match.get("range", {}).get("start", {}).get("line", 0) + 1,
-        "rule": match.get("ruleId"),
-        "severity": match.get("severity"),
-        "message": match.get("message"),
-    }
+    return ScanFinding(
+        file=match.get("file"),
+        line=match.get("range", {}).get("start", {}).get("line", 0) + 1,
+        rule=match.get("ruleId"),
+        severity=match.get("severity"),
+        message=match.get("message"),
+    )
 
 
-def scan_targets(run: LintRun) -> list[str]:
+def build_scan_arguments(run: LintRun) -> list[str]:
     if run.mode == "full":
         excludes = [f"!{pattern}" for pattern in run.config.values.scan.exclude]
         return [argument for glob in excludes for argument in ("--globs", glob)] + ["."]
@@ -138,25 +145,25 @@ def scan_targets(run: LintRun) -> list[str]:
     ]
 
 
-def step_scan(run: LintRun) -> StepResult:
+def run_scan_step(run: LintRun) -> StepResult:
     if run.mode != "full" and not run.files:
         return StepResult(ok=True, skipped="no changed files to scan")
-    sgconfig = sgconfig_path(run)
+    sgconfig = require_sgconfig(run)
     command = [find_tool("ast-grep"), "scan", "-c", str(sgconfig)]
     if run.json_output:
         command.append("--json=stream")
-    completed = run_tool([*command, *scan_targets(run)], run)
+    completed = run_tool([*command, *build_scan_arguments(run)], run)
     if not run.json_output:
-        return StepResult(ok=completed.returncode == 0)
-    findings: list[Any] = [
-        scan_finding(line) for line in completed.stdout.splitlines() if line
+        return build_step_result(completed)
+    findings: list[ScanFinding | str] = [
+        parse_scan_finding(line) for line in completed.stdout.splitlines() if line
     ]
     if completed.returncode and not findings:
-        findings = output_lines(completed)
+        findings = [*collect_output_lines(completed)]
     return StepResult(ok=completed.returncode == 0, findings=findings)
 
 
-def project_lint_imports(root: Path) -> list[str] | None:
+def find_project_lint_imports(root: Path) -> list[str] | None:
     """The repo's own lint-imports, when its uv environment provides one."""
     lock_file = root / "uv.lock"
     uv = shutil.which("uv")
@@ -169,49 +176,51 @@ def project_lint_imports(root: Path) -> list[str] | None:
     return None
 
 
-def step_imports(run: LintRun) -> StepResult:
+def build_bundled_lint_imports_environment(root: Path) -> dict[str, str]:
+    """Puts the repo on PYTHONPATH so the bundled lint-imports can import it."""
+    python_path = [str(root), str(root / "src"), os.environ.get("PYTHONPATH", "")]
+    return {
+        **os.environ,
+        "PYTHONPATH": os.pathsep.join(path for path in python_path if path),
+    }
+
+
+def run_imports_step(run: LintRun) -> StepResult:
     importlinter = run.config.values.importlinter
     if not importlinter.is_file():
         return StepResult(ok=True, skipped=f"no {importlinter.name}")
     root = run.config.root
-    command = project_lint_imports(root)
-    env = None
-    if command:
+    project_command = find_project_lint_imports(root)
+    if project_command:
         logger.info("lint: imports uses the project's lint-imports (uv run)")
+        command, environment = project_command, None
     else:
         logger.info("lint: imports uses the lint-imports bundled with rulepack")
         command = [find_tool("lint-imports")]
-        python_path = [str(root), str(root / "src"), os.environ.get("PYTHONPATH", "")]
-        env = {
-            **os.environ,
-            "PYTHONPATH": os.pathsep.join(path for path in python_path if path),
-        }
-    if importlinter.resolve() != (root / ".importlinter").resolve():
-        command += ["--config", str(importlinter)]
-    return tool_result(run_tool(command, run, env))
+        environment = build_bundled_lint_imports_environment(root)
+    is_default_config = importlinter.resolve() == (root / ".importlinter").resolve()
+    config_arguments = [] if is_default_config else ["--config", str(importlinter)]
+    return build_step_result(run_tool([*command, *config_arguments], run, environment))
 
 
 STEP_FUNCTIONS: dict[str, Callable[[LintRun], StepResult]] = {
-    "test": step_test,
-    "scan": step_scan,
-    "imports": step_imports,
+    "test": run_test_step,
+    "scan": run_scan_step,
+    "imports": run_imports_step,
 }
+STEPS = tuple(STEP_FUNCTIONS)
 
 
 def run_step(name: str, run: LintRun) -> StepResult:
     logger.info("lint: running %s", name)
     try:
         return STEP_FUNCTIONS[name](run)
-    except (LintError, ConfigError, subprocess.CalledProcessError) as error:
+    except (LintError, ConfigError) as error:
         logger.error("lint: %s: %s", name, error)
         return StepResult(ok=False, findings=[str(error)])
 
 
-def run_lint(steps: list[str], run: LintRun) -> dict[str, StepResult]:
-    return {name: run_step(name, run) for name in steps}
-
-
-def selected_steps(only: list[str] | None, skip: list[str] | None) -> list[str]:
+def select_steps(only: list[str] | None, skip: list[str] | None) -> list[str]:
     return [
         step
         for step in STEPS
@@ -226,10 +235,10 @@ def is_excluded(path: Path, root: Path, exclude_globs: list[str]) -> bool:
     return any(fnmatch.fnmatch(relative, pattern) for pattern in exclude_globs)
 
 
-def selected_files(config: ResolvedConfig, names: list[str]) -> list[Path]:
+def select_files(config: ResolvedConfig, paths: list[Path]) -> list[Path]:
     """The given files that exist, have a scanned extension and are not excluded."""
     extensions = config.values.scan.extensions
-    files = {Path(name).resolve() for name in names}
+    files = {path.resolve() for path in paths}
     return sorted(
         path
         for path in files
@@ -245,14 +254,14 @@ def build_run(arguments: argparse.Namespace) -> LintRun:
         return LintRun(
             config=config,
             mode="files",
-            files=selected_files(config, arguments.files),
+            files=select_files(config, [Path(name) for name in arguments.files]),
             json_output=arguments.json,
         )
     if not arguments.changed:
         return LintRun(config=config, json_output=arguments.json)
     if config.git_root is None:
         raise LintError("--changed needs a git repository")
-    changed = changed_files(
+    changed = list_changed_files(
         config.git_root,
         base_ref=arguments.base_ref,
         default_base_ref=config.values.changed.base_ref,
@@ -262,7 +271,7 @@ def build_run(arguments: argparse.Namespace) -> LintRun:
     return LintRun(
         config=config,
         mode="changed",
-        files=selected_files(config, [str(path) for path in changed]),
+        files=select_files(config, changed),
         json_output=arguments.json,
     )
 
@@ -332,8 +341,8 @@ def main(argv: list[str] | None = None) -> int:
     arguments = parse_arguments(argv)
     try:
         run = build_run(arguments)
-        steps = selected_steps(arguments.only, arguments.skip)
-        results = run_lint(steps, run)
+        steps = select_steps(arguments.only, arguments.skip)
+        results = {name: run_step(name, run) for name in steps}
     except (LintError, ConfigError, ChangedFilesError, yaml.YAMLError) as error:
         logger.error("rulepack lint: %s", error)
         return 2

@@ -4,14 +4,14 @@ from pathlib import Path
 
 import pytest
 
-from tests.rulepack.lint.helpers import git, init_git_repository
+from tests.rulepack.lint.helpers import init_git_repository, run_git
 
 
 @pytest.fixture
 def commit():
     def run(repository: Path, message: str = "change") -> None:
-        git(repository, "add", "--all")
-        git(repository, "commit", "--quiet", "-m", message)
+        run_git(repository, "add", "--all")
+        run_git(repository, "commit", "--quiet", "-m", message)
 
     return run
 
@@ -24,7 +24,7 @@ def feature_repository(tmp_path: Path) -> Path:
     for name in ("a.py", "b.py", "notes.txt"):
         (repository / name).write_text("x = 1\n", encoding="utf-8")
     init_git_repository(repository)
-    git(repository, "checkout", "--quiet", "-b", "feature")
+    run_git(repository, "checkout", "--quiet", "-b", "feature")
     return repository
 
 
@@ -61,15 +61,15 @@ def run_lint(run_rulepack, lint_sandbox: Path):
 
 
 @pytest.fixture
-def import_contract(lint_sandbox: Path):
+def write_import_contract(lint_sandbox: Path):
     """A package whose core imports its adapters, and a contract forbidding it."""
 
     def write(core_imports_adapters: bool) -> None:
         package = lint_sandbox / "app"
         (package / "core").mkdir(parents=True)
         (package / "adapters").mkdir()
-        for init in (package, package / "core", package / "adapters"):
-            (init / "__init__.py").write_text("", encoding="utf-8")
+        for directory in (package, package / "core", package / "adapters"):
+            (directory / "__init__.py").write_text("", encoding="utf-8")
         source = "from app.adapters import store\n" if core_imports_adapters else ""
         (package / "core" / "logic.py").write_text(source, encoding="utf-8")
         (package / "adapters" / "store.py").write_text("", encoding="utf-8")

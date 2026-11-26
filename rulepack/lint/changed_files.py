@@ -6,7 +6,7 @@ class ChangedFilesError(Exception):
     pass
 
 
-def git(root: Path, *arguments: str) -> subprocess.CompletedProcess[str]:
+def run_git(root: Path, *arguments: str) -> subprocess.CompletedProcess[str]:
     return subprocess.run(
         ["git", *arguments],
         cwd=root,
@@ -18,8 +18,8 @@ def git(root: Path, *arguments: str) -> subprocess.CompletedProcess[str]:
     )
 
 
-def git_lines(root: Path, *arguments: str) -> list[str]:
-    completed = git(root, *arguments)
+def read_git_lines(root: Path, *arguments: str) -> list[str]:
+    completed = run_git(root, *arguments)
     if completed.returncode != 0:
         raise ChangedFilesError(
             f"git {' '.join(arguments)} failed: {completed.stderr.strip()}"
@@ -28,11 +28,11 @@ def git_lines(root: Path, *arguments: str) -> list[str]:
 
 
 def ref_exists(root: Path, ref: str) -> bool:
-    completed = git(root, "rev-parse", "--verify", "--quiet", f"{ref}^{{commit}}")
+    completed = run_git(root, "rev-parse", "--verify", "--quiet", f"{ref}^{{commit}}")
     return completed.returncode == 0
 
 
-def local_branch(ref: str) -> str:
+def strip_remote_prefix(ref: str) -> str:
     """`origin/main` -> `main`; a ref without a remote prefix stays as it is."""
     return ref.split("/", 1)[1] if "/" in ref else ref
 
@@ -45,15 +45,15 @@ def resolve_base_ref(root: Path, explicit: str | None, default: str) -> str | No
                 "(CI: actions/checkout with fetch-depth: 0)."
             )
         return explicit
-    for candidate in (default, local_branch(default)):
+    for candidate in (default, strip_remote_prefix(default)):
         if ref_exists(root, candidate):
             return candidate
     return None
 
 
-def diff_base(root: Path, base_ref: str | None, explicit: bool) -> str:
+def resolve_diff_base(root: Path, base_ref: str | None, explicit: bool) -> str:
     if base_ref is not None:
-        merge_base = git(root, "merge-base", base_ref, "HEAD")
+        merge_base = run_git(root, "merge-base", base_ref, "HEAD")
         if merge_base.returncode == 0:
             return merge_base.stdout.strip()
         if explicit:
@@ -63,7 +63,7 @@ def diff_base(root: Path, base_ref: str | None, explicit: bool) -> str:
     return "HEAD" if ref_exists(root, "HEAD") else "--cached"
 
 
-def changed_files(
+def list_changed_files(
     root: Path,
     *,
     base_ref: str | None = None,
@@ -79,12 +79,16 @@ def changed_files(
     An explicit base must resolve. With `staged`: only the staged files.
     """
     if staged:
-        names = git_lines(root, "diff", "--cached", "--name-only", "--diff-filter=ACMR")
+        names = read_git_lines(
+            root, "diff", "--cached", "--name-only", "--diff-filter=ACMR"
+        )
     else:
         resolved = resolve_base_ref(root, base_ref, default_base_ref)
-        base = diff_base(root, resolved, explicit=base_ref is not None)
-        names = git_lines(root, "diff", "--name-only", "--diff-filter=ACMR", base, "--")
-        names += git_lines(root, "ls-files", "--others", "--exclude-standard")
+        base = resolve_diff_base(root, resolved, explicit=base_ref is not None)
+        names = read_git_lines(
+            root, "diff", "--name-only", "--diff-filter=ACMR", base, "--"
+        )
+        names += read_git_lines(root, "ls-files", "--others", "--exclude-standard")
     paths = {root / name for name in names}
     return sorted(
         path

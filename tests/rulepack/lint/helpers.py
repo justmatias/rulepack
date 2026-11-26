@@ -2,7 +2,7 @@ import subprocess
 from pathlib import Path
 
 
-def git(repository: Path, *arguments: str) -> str:
+def run_git(repository: Path, *arguments: str) -> str:
     completed = subprocess.run(
         ["git", *arguments],
         cwd=repository,
@@ -14,14 +14,14 @@ def git(repository: Path, *arguments: str) -> str:
 
 
 def init_git_repository(repository: Path) -> Path:
-    git(repository, "init", "--quiet", "--initial-branch=main")
-    git(repository, "config", "user.email", "tests@example.invalid")
-    git(repository, "config", "user.name", "Tests")
-    git(repository, "config", "commit.gpgsign", "false")
-    git(repository, "add", "--all")
-    git(repository, "commit", "--quiet", "--allow-empty", "-m", "initial")
+    run_git(repository, "init", "--quiet", "--initial-branch=main")
+    run_git(repository, "config", "user.email", "tests@example.invalid")
+    run_git(repository, "config", "user.name", "Tests")
+    run_git(repository, "config", "commit.gpgsign", "false")
+    run_git(repository, "add", "--all")
+    run_git(repository, "commit", "--quiet", "--allow-empty", "-m", "initial")
     return repository
 
 
-def names(paths: list[Path], repository: Path) -> list[str]:
+def list_relative_names(paths: list[Path], repository: Path) -> list[str]:
     return [path.relative_to(repository).as_posix() for path in paths]

@@ -4,7 +4,7 @@ import sysconfig
 from pathlib import Path
 
 from rulepack.lint.command import STEPS, find_tool
-from tests.rulepack.lint.helpers import git
+from tests.rulepack.lint.helpers import run_git
 
 
 def test_lint_passes_when_repository_is_clean(run_lint):
@@ -41,7 +41,7 @@ def test_scan_fails_when_file_is_invalid(
 def test_changed_fails_when_file_has_a_warning_the_full_scan_tolerates(
     run_lint, lint_sandbox: Path, manual_init_file: Path
 ):
-    git(lint_sandbox, "checkout", "--quiet", "-b", "feature")
+    run_git(lint_sandbox, "checkout", "--quiet", "-b", "feature")
     shutil.copy(manual_init_file, lint_sandbox / "valid" / "models.py")
 
     full_exit_code, full = run_lint("--only", "scan")
@@ -102,16 +102,16 @@ def test_imports_is_skipped_when_importlinter_is_missing(run_lint, lint_sandbox:
     }
 
 
-def test_imports_passes_when_the_contract_is_kept(run_lint, import_contract):
-    import_contract(core_imports_adapters=False)
+def test_imports_passes_when_the_contract_is_kept(run_lint, write_import_contract):
+    write_import_contract(core_imports_adapters=False)
 
     exit_code, report = run_lint("--only", "imports")
 
     assert exit_code == 0, report
 
 
-def test_imports_fails_when_the_contract_is_broken(run_lint, import_contract):
-    import_contract(core_imports_adapters=True)
+def test_imports_fails_when_the_contract_is_broken(run_lint, write_import_contract):
+    write_import_contract(core_imports_adapters=True)
 
     exit_code, report = run_lint("--only", "imports")
 
