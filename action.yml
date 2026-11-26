@@ -1,0 +1,108 @@
+name: rulepack lint
+description: >-
+  Run rulepack lint in any repo: the full scan, and on pull requests the
+  changed-files scan where warnings fail too. The caller checks out the code
+  with fetch-depth 0.
+author: justmatias
+
+inputs:
+  mode:
+    description: >-
+      full, changed or both. Default: both on pull_request, full otherwise.
+    required: false
+    default: ""
+  base-ref:
+    description: >-
+      The ref the changed-files scan compares against. Default:
+      origin/<the pull request's base branch>.
+    required: false
+    default: ""
+  rulepack-version:
+    description: >-
+      The rulepack tag or sha to run. Default: the action's own ref, so the CLI
+      and the action always match.
+    required: false
+    default: ""
+  python-version:
+    description: The Python version rulepack runs on.
+    required: false
+    default: "3.12"
+  working-directory:
+    description: Where to run rulepack lint (the repo root by default).
+    required: false
+    default: "."
+
+runs:
+  using: composite
+  steps:
+    - name: Install uv
+      uses: astral-sh/setup-uv@v7
+      with:
+        version: "0.12.3"
+        python-version: ${{ inputs.python-version }}
+
+    - name: Resolve mode, base ref and rulepack source
+      id: resolve
+      shell: bash
+      env:
+        INPUT_MODE: ${{ inputs.mode }}
+        INPUT_BASE_REF: ${{ inputs.base-ref }}
+        INPUT_VERSION: ${{ inputs.rulepack-version }}
+        EVENT_NAME: ${{ github.event_name }}
+        PR_BASE_REF: ${{ github.base_ref }}
+        ACTION_REPOSITORY: ${{ github.action_repository }}
+        ACTION_REF: ${{ github.action_ref }}
+        ACTION_PATH: ${{ github.action_path }}
+      run: |
+        set -euo pipefail
+        mode="$INPUT_MODE"
+        if [[ -z "$mode" ]]; then
+          if [[ "$EVENT_NAME" == "pull_request" ]]; then mode="both"; else mode="full"; fi
+        fi
+        case "$mode" in
+          full|changed|both) ;;
+          *) echo "rulepack lint action: mode must be full, changed or both, not '$mode'" >&2; exit 1 ;;
+        esac
+        base_ref="$INPUT_BASE_REF"
+        if [[ -z "$base_ref" && -n "$PR_BASE_REF" ]]; then base_ref="origin/$PR_BASE_REF"; fi
+        if [[ "$mode" != "full" && -z "$base_ref" ]]; then
+          echo "rulepack lint action: mode '$mode' needs base-ref outside pull requests" >&2
+          exit 1
+        fi
+        repository="${ACTION_REPOSITORY:-justmatias/rulepack}"
+        if [[ -n "$INPUT_VERSION" ]]; then
+          source="git+https://github.com/$repository@$INPUT_VERSION"
+        elif [[ -n "$ACTION_REF" ]]; then
+          source="git+https://github.com/$repository@$ACTION_REF"
+        else
+          # `uses: ./` in this repo: run the checked-out code itself.
+          source="$ACTION_PATH"
+        fi
+        {
+          echo "mode=$mode"
+          echo "base-ref=$base_ref"
+          echo "source=$source"
+        } >> "$GITHUB_OUTPUT"
+
+    - name: rulepack lint (full scan)
+      if: steps.resolve.outputs.mode != 'changed'
+      shell: bash
+      working-directory: ${{ inputs.working-directory }}
+      env:
+        RULEPACK_SOURCE: ${{ steps.resolve.outputs.source }}
+      run: uvx --from "$RULEPACK_SOURCE" rulepack lint
+
+    # Fails with a clear message when the base ref is missing: check out with
+    # fetch-depth: 0 so origin/<base branch> exists.
+    - name: rulepack lint (changed files, warnings included)
+      if: steps.resolve.outputs.mode != 'full'
+      shell: bash
+      working-directory: ${{ inputs.working-directory }}
+      env:
+        RULEPACK_SOURCE: ${{ steps.resolve.outputs.source }}
+        BASE_REF: ${{ steps.resolve.outputs.base-ref }}
+      run: uvx --from "$RULEPACK_SOURCE" rulepack lint --changed --base-ref "$BASE_REF"
+
+branding:
+  icon: check-square
+  color: green

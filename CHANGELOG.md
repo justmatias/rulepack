@@ -2,6 +2,19 @@
 
 <!-- version list -->
 
+## v0.4.0 (2026-11-26)
+
+### Features
+
+- Publish the checks as pre-commit hooks and a GitHub Action
+  ([`aba1b19`](https://github.com/justmatias/rulepack/commit/aba1b19aa8c492485f0aa6f4f629f0bb0902f23d))
+
+### Testing
+
+- Remove the pre-commit hooks tests
+  ([`f04f41b`](https://github.com/justmatias/rulepack/commit/f04f41be83d20117db67ab772d751d6740286798))
+
+
 ## v0.3.0 (2026-11-26)
 
 ### Features

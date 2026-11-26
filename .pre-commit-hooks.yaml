@@ -1,0 +1,26 @@
+# Hooks other repos use from their .pre-commit-config.yaml, pinned to a release tag.
+# pre-commit installs rulepack at that tag in its own environment, with ast-grep and
+# import-linter as runtime dependencies, so the target repo needs nothing else.
+- id: rulepack-lint
+  name: rulepack lint (ast-grep scan of the staged files)
+  description: Scan the staged files with the repo's ast-grep rules; warnings fail too.
+  entry: rulepack lint --only scan --files
+  language: python
+
+- id: rulepack-rules
+  name: rulepack rules (ast-grep rule tests)
+  description: Run the ast-grep rule tests when a rule or its test changes.
+  entry: rulepack lint --only test
+  language: python
+  pass_filenames: false
+  files: \.ya?ml$
+
+- id: rulepack-imports
+  name: rulepack imports (import-linter contracts)
+  description: >-
+    Check the .importlinter contracts. import-linter must import the project: when it
+    needs third-party packages, list them in additional_dependencies.
+  entry: rulepack lint --only imports
+  language: python
+  pass_filenames: false
+  files: (^|/)\.importlinter$|\.py$
