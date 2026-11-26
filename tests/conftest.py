@@ -1,5 +1,4 @@
 import json
-import subprocess
 from pathlib import Path
 
 import pytest
@@ -49,14 +48,3 @@ def scan_findings(sample_repository: Path):
         return [json.loads(line) for line in completed.stdout.splitlines() if line]
 
     return scan
-
-
-@pytest.fixture
-def repository_with_a_rule(tmp_path: Path) -> Path:
-    repository = tmp_path / "target"
-    (repository / "lint-rules" / "rules").mkdir(parents=True)
-    (repository / "lint-rules" / "sgconfig.yml").write_text("ruleDirs:\n  - rules\n")
-    source = SAMPLE_REPOSITORY / "lint" / "rules" / "no-bare-except.yml"
-    (repository / "lint-rules" / "rules" / source.name).write_bytes(source.read_bytes())
-    subprocess.run(["git", "init", "--quiet"], cwd=repository, check=True)
-    return repository
