@@ -11,12 +11,8 @@ from rulepack.project_paths import CONFIG_FILE_NAME, find_config_path, find_git_
 
 # Keys whose values are paths (or lists of paths) relative to the config file.
 PATH_KEYS = {
-    "rules_dir",
     "sgconfig",
     "importlinter",
-    "pre_commit_config",
-    "domain_check.paths",
-    "domain_check.exclude",
 }
 
 Source = Literal["default", "file", "flag"]
@@ -35,11 +31,6 @@ class ScanSettings(StrictModel):
     extensions: list[str] = [".py"]
 
 
-class DomainCheckSettings(StrictModel):
-    paths: list[Path] = [Path("lint-rules"), Path(".cursor/rules")]
-    exclude: list[Path] = []
-
-
 class ChangedSettings(StrictModel):
     base_ref: str = "origin/main"
 
@@ -50,13 +41,10 @@ class HookSettings(StrictModel):
 
 
 class ProjectConfig(StrictModel):
-    rules_dir: Path = Path(".cursor/rules")
     sgconfig: Path = Path("lint-rules/sgconfig.yml")
     importlinter: Path = Path(".importlinter")
-    pre_commit_config: Path = Path(".pre-commit-config.yaml")
     scan: ScanSettings = ScanSettings()
     hooks: HookSettings = HookSettings()
-    domain_check: DomainCheckSettings = DomainCheckSettings()
     changed: ChangedSettings = ChangedSettings()
 
 
@@ -124,7 +112,7 @@ def resolve_config(
 ) -> ResolvedConfig:
     """Merge built-in defaults, the repo config and flags, in that order.
 
-    `overrides` maps dotted keys (`rules_dir`, `domain_check.paths`) to flag values;
+    `overrides` maps dotted keys (`sgconfig`, `scan.exclude`) to flag values;
     None means the flag was not given. Flag paths resolve against the current
     directory, file and default paths against the config file's directory.
     """
@@ -197,7 +185,6 @@ def main(argv: list[str] | None = None) -> int:
             "each value comes from."
         ),
     )
-    parser.add_argument("--rules-dir", type=Path)
     parser.add_argument("--sgconfig", type=Path)
     parser.add_argument("--importlinter", type=Path)
     parser.add_argument(
@@ -207,7 +194,6 @@ def main(argv: list[str] | None = None) -> int:
 
     description = describe(
         resolve_config({
-            "rules_dir": arguments.rules_dir,
             "sgconfig": arguments.sgconfig,
             "importlinter": arguments.importlinter,
         })

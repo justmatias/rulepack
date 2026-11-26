@@ -39,8 +39,8 @@ def write_config(git_repository: Path):
 
 
 @pytest.fixture
-def _write_rules_dir_config(write_config) -> None:
-    write_config('rules_dir = "rules"\n')
+def _write_sgconfig_config(write_config) -> None:
+    write_config('sgconfig = "checks/sgconfig.yml"\n')
 
 
 @pytest.fixture
