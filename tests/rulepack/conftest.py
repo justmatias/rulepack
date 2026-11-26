@@ -3,13 +3,18 @@ from pathlib import Path
 
 import pytest
 
-from tests.helpers import REPOSITORY_ROOT, run_command
+from tests.helpers import run_command
 from tests.rulepack.helpers import git
 
 
 @pytest.fixture
-def run_rulepack():
-    def run(command: str, *arguments: str, working_directory: Path = REPOSITORY_ROOT):
+def repository_root() -> Path:
+    return Path(__file__).resolve().parents[2]
+
+
+@pytest.fixture
+def run_rulepack(repository_root: Path):
+    def run(command: str, *arguments: str, working_directory: Path = repository_root):
         return run_command(
             [sys.executable, "-m", "rulepack", command, *arguments], working_directory
         )
