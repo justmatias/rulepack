@@ -65,13 +65,6 @@ def read_toml(path: Path) -> dict[str, Any]:
         raise ConfigError(f"{path}: invalid TOML ({error})") from error
 
 
-def find_config_file(
-    start: Path, git_root: Path | None
-) -> tuple[Path, dict[str, Any]] | None:
-    path = find_config_path(start, git_root)
-    return (path, read_toml(path)) if path else None
-
-
 def flatten(data: dict[str, Any], prefix: str = "") -> dict[str, Any]:
     flat: dict[str, Any] = {}
     for key, value in data.items():
@@ -119,8 +112,8 @@ def resolve_config(
     current_directory = Path.cwd()
     start = (start or current_directory).resolve()
     git_root = find_git_root(start)
-    found = find_config_file(start, git_root)
-    config_file, file_data = found or (None, {})
+    config_file = find_config_path(start, git_root)
+    file_data = read_toml(config_file) if config_file else {}
     root = config_file.parent if config_file else (git_root or start)
 
     file_values = flatten(
