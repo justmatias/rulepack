@@ -37,6 +37,7 @@ def source_files(paths: list[Path], root: Path, exclude_globs: list[str]) -> lis
             [
                 "git",
                 "ls-files",
+                "-z",
                 "--cached",
                 "--others",
                 "--exclude-standard",
@@ -45,7 +46,7 @@ def source_files(paths: list[Path], root: Path, exclude_globs: list[str]) -> lis
             capture_output=True,
             text=True,
             check=True,
-        ).stdout.split()
+        ).stdout.split("\0")
         return [
             Path(name)
             for name in listed
