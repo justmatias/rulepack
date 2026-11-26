@@ -36,13 +36,3 @@ def write_config(git_repository: Path):
         return path
 
     return write
-
-
-@pytest.fixture
-def _write_rules_dir_config(write_config) -> None:
-    write_config('rules_dir = "rules"\n')
-
-
-@pytest.fixture
-def _change_to_git_repository(git_repository: Path, monkeypatch) -> None:
-    monkeypatch.chdir(git_repository)

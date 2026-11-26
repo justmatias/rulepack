@@ -1,20 +1,19 @@
 import argparse
 import importlib
+import importlib.metadata
 import logging
 import sys
 
 logger = logging.getLogger(__name__)
 
 COMMANDS = {
-    "config": "rulepack.config",
-    "exceptions": "rulepack.exceptions",
+    "config": "rulepack.config.command",
 }
 
 
 def main(argv: list[str] | None = None) -> int:
     arguments = sys.argv[1:] if argv is None else argv
     logging.basicConfig(level=logging.INFO, format="%(message)s")
-    metadata = importlib.import_module("importlib.metadata")
     parser = argparse.ArgumentParser(
         prog="rulepack",
         description=(
@@ -25,7 +24,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument(
         "--version",
         action="version",
-        version=f"rulepack {metadata.version('rulepack')}",
+        version=f"rulepack {importlib.metadata.version('rulepack')}",
     )
     parser.add_argument("command", choices=COMMANDS)
     parsed = parser.parse_args(arguments[:1])

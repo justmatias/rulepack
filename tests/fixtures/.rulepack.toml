@@ -7,7 +7,3 @@ sgconfig = "lint/sgconfig.yml"
 # invalid/ breaks the checks on purpose; CI scans it alone and expects failures.
 exclude = ["invalid/**"]
 extensions = [".py"]
-
-[domain_check]
-paths = ["lint"]
-exclude = ["invalid"]
