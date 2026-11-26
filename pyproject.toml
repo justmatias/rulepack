@@ -1,6 +1,6 @@
 [project]
 name = "rulepack"
-version = "0.2.0"
+version = "0.3.0"
 description = "Run ast-grep and import-linter checks from shared, versioned rule packs in any repo."
 readme = "README.md"
 license = { text = "MIT" }

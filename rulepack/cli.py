@@ -8,6 +8,7 @@ logger = logging.getLogger(__name__)
 
 COMMANDS = {
     "config": "rulepack.config.command",
+    "lint": "rulepack.lint.command",
 }
 
 
