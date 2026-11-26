@@ -108,7 +108,6 @@ load-plugins = [
 ##################################
 
 [tool.mypy]
-plugins = ["pydantic.mypy"]
 python_version = "3.12"
 exclude = ["^tests/fixtures/"]
 disallow_untyped_defs = true
