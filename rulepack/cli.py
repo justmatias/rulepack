@@ -7,7 +7,7 @@ import sys
 logger = logging.getLogger(__name__)
 
 COMMANDS = {
-    "config": "rulepack.config",
+    "config": "rulepack.config.command",
 }
 
 

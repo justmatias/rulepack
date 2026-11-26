@@ -1,13 +1,11 @@
-import argparse
-import json
-import sys
 import tomllib
 from pathlib import Path
-from typing import Any, Literal
+from typing import Any
 
-from pydantic import BaseModel, ConfigDict, Field, ValidationError
+from pydantic import ValidationError
 
-from rulepack.project_paths import CONFIG_FILE_NAME, find_config_path, find_git_root
+from rulepack.config.project_paths import find_config_path, find_git_root
+from rulepack.config.settings import ProjectConfig, ResolvedConfig, Source
 
 # Keys whose values are paths (or lists of paths) relative to the config file.
 PATH_KEYS = {
@@ -15,47 +13,9 @@ PATH_KEYS = {
     "importlinter",
 }
 
-Source = Literal["default", "file", "flag"]
-
 
 class ConfigError(Exception):
     pass
-
-
-class StrictModel(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-
-
-class ScanSettings(StrictModel):
-    exclude: list[str] = []
-    extensions: list[str] = [".py"]
-
-
-class ChangedSettings(StrictModel):
-    base_ref: str = "origin/main"
-
-
-class HookSettings(StrictModel):
-    enabled: bool = True
-    timeout: float = Field(default=10.0, gt=0, allow_inf_nan=False)
-
-
-class ProjectConfig(StrictModel):
-    sgconfig: Path = Path("lint-rules/sgconfig.yml")
-    importlinter: Path = Path(".importlinter")
-    scan: ScanSettings = ScanSettings()
-    hooks: HookSettings = HookSettings()
-    changed: ChangedSettings = ChangedSettings()
-
-
-class ResolvedConfig(StrictModel):
-    """The merged config. Every path value is absolute."""
-
-    root: Path
-    git_root: Path | None
-    file: Path | None
-    values: ProjectConfig
-    sources: dict[str, Source]
 
 
 def read_toml(path: Path) -> dict[str, Any]:
@@ -141,66 +101,3 @@ def resolve_config(
         values=validate(unflatten(merged), "resolved config"),
         sources=sources,
     )
-
-
-def display_value(value: Any, root: Path) -> Any:
-    if isinstance(value, list):
-        return [display_value(item, root) for item in value]
-    if isinstance(value, Path):
-        return (
-            value.relative_to(root).as_posix()
-            if value.is_relative_to(root)
-            else str(value)
-        )
-    return value
-
-
-def describe(config: ResolvedConfig) -> dict[str, Any]:
-    values = flatten(config.values.model_dump())
-    return {
-        "file": str(config.file) if config.file else None,
-        "root": str(config.root),
-        "settings": {
-            key: {
-                "value": display_value(value, config.root),
-                "source": config.sources[key],
-            }
-            for key, value in values.items()
-        },
-    }
-
-
-def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(
-        prog="rulepack config",
-        description=(
-            f"Print the resolved project config ({CONFIG_FILE_NAME}) and where "
-            "each value comes from."
-        ),
-    )
-    parser.add_argument("--sgconfig", type=Path)
-    parser.add_argument("--importlinter", type=Path)
-    parser.add_argument(
-        "--json", action="store_true", help="Print the resolved config as JSON."
-    )
-    arguments = parser.parse_args(argv)
-
-    description = describe(
-        resolve_config({
-            "sgconfig": arguments.sgconfig,
-            "importlinter": arguments.importlinter,
-        })
-    )
-    if arguments.json:
-        sys.stdout.write(json.dumps(description, indent=2) + "\n")
-        return 0
-    lines = [
-        f"# file: {description['file'] or 'none (built-in defaults)'}",
-        f"# root: {description['root']}",
-    ]
-    lines.extend(
-        f"{key} = {json.dumps(setting['value'])}  # {setting['source']}"
-        for key, setting in description["settings"].items()
-    )
-    sys.stdout.write("\n".join(lines) + "\n")
-    return 0
