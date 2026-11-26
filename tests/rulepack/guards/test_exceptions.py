@@ -1,4 +1,8 @@
+from pathlib import Path
+
 import pytest
+
+from tests.rulepack.helpers import init_git_repository
 
 VALID_HEADER = (
     '# rule-exception: reason="third-party legacy API" expires=2999-12-31 '
@@ -70,3 +74,19 @@ def test_exceptions_check_shell_files_when_folder_is_given(
 
     assert completed.returncode == 1
     assert "task.sh" in completed.stderr
+
+
+def test_exceptions_check_listed_file_when_its_name_has_a_space(
+    run_rulepack, tmp_path: Path
+):
+    repository = tmp_path / "repository"
+    repository.mkdir()
+    (repository / "my file.py").write_text(
+        "x = 1  # ast-grep-ignore: no-print\n", encoding="utf-8"
+    )
+    init_git_repository(repository)
+
+    completed = run_rulepack("exceptions", working_directory=repository)
+
+    assert completed.returncode == 1
+    assert "my file.py" in completed.stderr
