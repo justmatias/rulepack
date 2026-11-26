@@ -8,6 +8,7 @@ logger = logging.getLogger(__name__)
 
 COMMANDS = {
     "config": "rulepack.config.command",
+    "hook": "rulepack.hook.command",
     "init": "rulepack.init.command",
     "lint": "rulepack.lint.command",
 }
@@ -16,6 +17,9 @@ COMMANDS = {
 def main(argv: list[str] | None = None) -> int:
     arguments = sys.argv[1:] if argv is None else argv
     logging.basicConfig(level=logging.INFO, format="%(message)s")
+    if arguments[:1] == ["hook"]:
+        command = importlib.import_module(COMMANDS["hook"])
+        return int(command.main(arguments[1:]))
     parser = argparse.ArgumentParser(
         prog="rulepack",
         description=(

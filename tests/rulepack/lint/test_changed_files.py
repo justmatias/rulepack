@@ -1,7 +1,7 @@
 import pytest
 
 from rulepack.lint.changed_files import ChangedFilesError, list_changed_files
-from tests.rulepack.lint.helpers import list_relative_names, run_git
+from tests.rulepack.helpers import list_relative_names, run_git
 
 
 def test_lists_committed_uncommitted_and_untracked_files_when_not_staged(

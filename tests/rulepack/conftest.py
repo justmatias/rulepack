@@ -1,9 +1,11 @@
+import shutil
 import sys
 from pathlib import Path
 
 import pytest
 
 from tests.helpers import run_command
+from tests.rulepack.helpers import init_git_repository, run_git
 
 
 @pytest.fixture
@@ -36,3 +38,22 @@ def write_config(git_repository: Path):
         return path
 
     return write
+
+
+@pytest.fixture
+def commit():
+    def run(repository: Path, message: str = "change") -> None:
+        run_git(repository, "add", "--all")
+        run_git(repository, "commit", "--quiet", "-m", message)
+
+    return run
+
+
+@pytest.fixture
+def lint_sandbox(sample_repository: Path, tmp_path: Path) -> Path:
+    """A committed git repo with the sample checks, fixtures and config."""
+    sandbox = tmp_path / "sandbox"
+    shutil.copytree(
+        sample_repository, sandbox, ignore=shutil.ignore_patterns("__pycache__")
+    )
+    return init_git_repository(sandbox)

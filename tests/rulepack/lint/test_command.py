@@ -5,7 +5,7 @@ import sysconfig
 from pathlib import Path
 
 from rulepack.lint.command import STEPS, find_tool
-from tests.rulepack.lint.helpers import run_git
+from tests.rulepack.helpers import run_git
 
 
 def test_lint_passes_when_repository_is_clean(run_lint):
