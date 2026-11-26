@@ -50,12 +50,8 @@ def test_config_fails_when_key_is_unknown(
         resolve_config(start=git_repository)
 
 
-def test_flag_overrides_file_when_both_set_a_key(
-    git_repository: Path, write_config, monkeypatch
-):
-    write_config('rules_dir = "rules"\n')
-    monkeypatch.chdir(git_repository)
-
+@pytest.mark.usefixtures("_write_rules_dir_config", "_change_to_git_repository")
+def test_flag_overrides_file_when_both_set_a_key(git_repository: Path):
     config = resolve_config({"rules_dir": Path("other-rules"), "sgconfig": None})
 
     assert config.values.rules_dir == git_repository / "other-rules"
@@ -63,10 +59,8 @@ def test_flag_overrides_file_when_both_set_a_key(
     assert config.sources["sgconfig"] == "default"
 
 
-def test_config_is_found_when_started_from_a_subfolder(
-    git_repository: Path, write_config
-):
-    write_config('rules_dir = "rules"\n')
+@pytest.mark.usefixtures("_write_rules_dir_config")
+def test_config_is_found_when_started_from_a_subfolder(git_repository: Path):
     subfolder = git_repository / "package" / "module"
     subfolder.mkdir(parents=True)
 
@@ -85,11 +79,10 @@ def test_config_is_not_found_when_it_is_above_the_git_root(git_repository: Path)
     assert config.values.rules_dir == git_repository / ".cursor/rules"
 
 
+@pytest.mark.usefixtures("_write_rules_dir_config")
 def test_config_command_reports_sources_when_flags_and_file_are_set(
-    run_rulepack, write_config, git_repository
+    run_rulepack, git_repository
 ):
-    write_config('rules_dir = "rules"\n')
-
     completed = run_rulepack(
         "config",
         "--sgconfig",
