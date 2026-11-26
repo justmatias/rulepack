@@ -1,0 +1,13 @@
+id: test-name-has-when-condition
+valid:
+  - |
+    def test_item_is_saved_when_valid(item):
+        assert item.saved
+  - |
+    @pytest.mark.parametrize("value", [1, 2])
+    def test_value_is_accepted_when_positive(value):
+        assert value > 0
+invalid:
+  - |
+    def test_item_is_saved(item):
+        assert item.saved

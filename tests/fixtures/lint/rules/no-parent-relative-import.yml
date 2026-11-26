@@ -1,0 +1,12 @@
+id: no-parent-relative-import
+language: Python
+severity: error
+message: Import from the package by its absolute name instead of `from ..`
+note: |
+  A parent-relative import ties the module to where it sits in the tree, so moving
+  it breaks the import. Same-directory imports (`from .x import y`) are fine.
+rule:
+  kind: import_prefix
+  regex: "^\\.\\."
+  inside:
+    kind: relative_import

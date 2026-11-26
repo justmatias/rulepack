@@ -8,7 +8,13 @@ authors = [
   { name = "Matias Gimenez", email = "matiasgimenez.dev@gmail.com" },
 ]
 requires-python = ">=3.12"
-dependencies = []
+# ast-grep and import-linter ship with the CLI, so `rulepack lint` works in any repo.
+dependencies = [
+    "ast-grep-cli>=0.51",
+    "import-linter>=2.17",
+    "pydantic>=2",
+    "pyyaml>=6",
+]
 
 [project.scripts]
 rulepack = "rulepack.cli:main"
@@ -20,6 +26,7 @@ repository = "https://github.com/justmatias/rulepack"
 dev = [
     "pre-commit>=4",
     "pytest",
+    "types-pyyaml",
 ]
 
 [build-system]
@@ -39,6 +46,11 @@ include = [
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+# Slow tests install rulepack from scratch (pre-commit try-repo); CI runs them with -m slow.
+markers = ["slow: installs packages; run with -m slow"]
+addopts = "-m 'not slow'"
+# tests/fixtures/ holds a sample repo for the checks (some files break them on purpose).
+norecursedirs = ["tests/fixtures"]
 
 ##################################
 # ruff configuration             #
@@ -46,6 +58,8 @@ testpaths = ["tests"]
 
 [tool.ruff]
 line-length = 88
+# tests/fixtures/ holds a sample repo with deliberate violations for the checks to catch.
+extend-exclude = ["tests/fixtures"]
 preview = true
 fix = true
 # T20: no print() left in code; use logging.
@@ -60,6 +74,7 @@ format.skip-magic-trailing-comma = false
 ##################################
 
 [tool.pylint]
+ignore-paths = ["^tests/fixtures/.*$"]
 disable = [
   "missing-docstring",
   "missing-module-docstring",
@@ -94,6 +109,7 @@ load-plugins = [
 
 [tool.mypy]
 python_version = "3.12"
+exclude = ["^tests/fixtures/"]
 disallow_untyped_defs = true
 show_error_codes = true
 no_implicit_optional = true

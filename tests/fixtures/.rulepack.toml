@@ -1,0 +1,13 @@
+# A sample repo for the tests and CI: checks in lint/, code that follows them in
+# valid/ and code that breaks them in invalid/. The tests copy this folder as a
+# repo of its own.
+sgconfig = "lint/sgconfig.yml"
+
+[scan]
+# invalid/ breaks the checks on purpose; CI scans it alone and expects failures.
+exclude = ["invalid/**"]
+extensions = [".py"]
+
+[domain_check]
+paths = ["lint"]
+exclude = ["invalid"]

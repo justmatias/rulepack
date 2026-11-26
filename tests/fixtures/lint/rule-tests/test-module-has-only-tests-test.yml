@@ -1,0 +1,40 @@
+id: test-module-has-only-tests
+valid:
+  - |
+    def test_item_is_saved(item):
+        assert item.saved
+  # Near miss: a function nested inside a test.
+  - |
+    def test_callback_is_called(bus):
+        def on_event(event):
+            bus.seen.append(event)
+
+        bus.subscribe(on_event)
+        assert bus.seen == []
+  - |
+    CASES = [(1, 2), (2, 3)]
+
+
+    @pytest.mark.parametrize(("value", "expected"), CASES)
+    def test_increment(value, expected):
+        assert value + 1 == expected
+invalid:
+  - |
+    class TestItem:
+        def test_is_saved(self, item):
+            assert item.saved
+  - |
+    class TestItem(unittest.TestCase):
+        def test_is_saved(self):
+            self.assertTrue(Item().saved)
+  - |
+    def make_item():
+        return Item(name="foo")
+
+
+    def test_item_is_saved():
+        assert make_item().saved
+  - |
+    @pytest.fixture
+    def item():
+        return Item()

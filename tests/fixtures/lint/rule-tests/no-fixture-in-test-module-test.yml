@@ -1,0 +1,25 @@
+id: no-fixture-in-test-module
+valid:
+  - |
+    def test_item_is_saved(item):
+        assert item.saved
+  - |
+    @pytest.mark.usefixtures("_seed_database")
+    def test_items_are_listed(store):
+        assert store.list()
+invalid:
+  - |
+    @pytest.fixture
+    def item():
+        return Item()
+  - |
+    @pytest.fixture(scope="module")
+    def store():
+        return Store()
+  - |
+    from pytest import fixture
+
+
+    @fixture
+    def item():
+        return Item()

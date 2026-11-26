@@ -1,0 +1,13 @@
+id: no-bare-except
+language: Python
+severity: error
+message: Name the exception type you expect (except ValueError:) instead of a bare except
+note: |
+  A bare except also catches KeyboardInterrupt and SystemExit,
+  and hides bugs that should propagate.
+rule:
+  kind: except_clause
+  not:
+    has:
+      field: value
+      regex: "."
