@@ -9,13 +9,13 @@ Run ast-grep and import-linter checks from shared, versioned rule packs in any r
 You need [`uv`](https://docs.astral.sh/uv/). Install the CLI from a release tag:
 
 ```bash
-uv tool install git+https://github.com/justmatias/rulepack@v0.2.0
+uv tool install git+https://github.com/justmatias/rulepack@v0.3.0
 ```
 
 Or run it without installing:
 
 ```bash
-uvx --from git+https://github.com/justmatias/rulepack@v0.2.0 rulepack --version
+uvx --from git+https://github.com/justmatias/rulepack@v0.3.0 rulepack --version
 ```
 
 semantic-release keeps the tag in these commands current. Until the first release, use `@main`.

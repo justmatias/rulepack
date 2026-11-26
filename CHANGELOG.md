@@ -2,6 +2,19 @@
 
 <!-- version list -->
 
+## v0.3.0 (2026-11-26)
+
+### Features
+
+- **lint**: Run the rule tests, scan and imports with rulepack lint
+  ([`7e20ef0`](https://github.com/justmatias/rulepack/commit/7e20ef088fba92cea11482d65fa4bb713099f5c3))
+
+### Refactoring
+
+- **lint**: Name functions for their action and type scan findings
+  ([`46f94c7`](https://github.com/justmatias/rulepack/commit/46f94c7f6aa3b9fd4ca9744885742025c538f678))
+
+
 ## v0.2.0 (2026-11-26)
 
 ### Refactoring
