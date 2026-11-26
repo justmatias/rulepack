@@ -1,0 +1,27 @@
+---
+description: Engineering principles for how an agent plans, changes and verifies code
+alwaysApply: true
+license: MIT
+metadata:
+  adapted-from: "pstack/skills/principle-* in cursor/plugins (https://github.com/cursor/plugins/tree/d42aff08aa58965d2735c4ead61a9af82b89d0d0/pstack/skills). Thanks to Lauren Tan for the original."
+  upstream-commit: "d42aff08aa58965d2735c4ead61a9af82b89d0d0"
+  upstream-license: "MIT, Copyright (c) 2026 Lauren Tan, https://github.com/cursor/plugins/blob/d42aff08aa58965d2735c4ead61a9af82b89d0d0/pstack/LICENSE"
+---
+
+# Engineering principles
+
+- **Prove it works.** Before saying a task is done, check the real result: run the feature, read the stored value, inspect the diff. A green build, a file timestamp or a subagent's summary is not proof. When a check fails, suspect how you observed before you suspect the system.
+- **Fix root causes.** Reproduce first, then trace the symptom back to the first place the system did something wrong, and fix it there. Add a guard only when the state it handles is legitimate, and look for every other place with the same fault.
+- **Attack the premise.** When two fixes that share an assumption have failed the same check, write the assumption down and test it directly before writing a third.
+- **Subtract before you add.** Delete dead code, redundant checks and unused paths first, then build on what is left. Make the smallest change that solves the problem, keep each decision in one place, and add no validator, layer or option for a case nobody has seen.
+- **Validate at the boundary.** Parse and validate data where it enters (CLI arguments, config, network, external APIs), and trust the types inside. Keep business logic in pure functions that a thin shell calls.
+- **Minimize reader load.** Inline wrappers with one caller and adapters with one implementation. Prefer return values over mutation and the narrowest scope that works, so a reader can find where a value comes from and what can change it.
+- **Migrate callers, then delete.** When a new internal API replaces an old one, move every caller and delete the old one in the same change, unless outside users depend on it. Do not keep a compatibility layer nobody needs.
+- **Make operations idempotent.** A command that changes state reads the current state, compares it with the goal and applies only the difference, so a rerun or a crash at any point converges. Write to a temporary path and rename it into place.
+- **Work in verifiable units.** Split multi-step work into small units that each end in a check, and do not start the next until the current one passes. Sequence the commits so they prove themselves: the failing test before the fix, the removal before the reshape.
+- **Don't block on reversible work.** Make the reasonable call on local, reversible work (writing code, splitting a task, picking a name), do it, and say why. Still ask before anything irreversible or outward-facing, and leave product direction to the human.
+
+Why: these are the judgment calls agents most often get wrong when no one is watching: claiming success from a proxy, patching symptoms, stacking fixes on a wrong assumption, adding instead of removing, and stopping to ask about work that is cheap to undo. Stating them once, where every request sees them, beats repeating them in each prompt.
+
+## Checks
+- enforcement: llm-review

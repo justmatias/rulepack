@@ -1,0 +1,15 @@
+id: no-parent-relative-import
+valid:
+  - |
+    from .models import Item
+  - |
+    from app.core import do_work
+  - |
+    from . import models
+invalid:
+  - |
+    from ..models import Item
+  - |
+    from ...core.models import Item
+  - |
+    from .. import models

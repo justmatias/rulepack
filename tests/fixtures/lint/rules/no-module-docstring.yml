@@ -1,0 +1,33 @@
+id: no-module-docstring
+language: Python
+severity: warning
+message: Remove the module docstring; document the classes and functions that need it
+note: |
+  A module docstring restates the file name and drifts from the code below it.
+  Class and function docstrings are fine where they add value.
+rule:
+  kind: expression_statement
+  inside:
+    kind: module
+  has:
+    any:
+      - kind: string
+      - kind: concatenated_string
+    stopBy:
+      not:
+        kind: parenthesized_expression
+  not:
+    has:
+      kind: string_start
+      regex: "(?i)^[a-z]*[bft]"
+      stopBy:
+        not:
+          any:
+            - kind: parenthesized_expression
+            - kind: concatenated_string
+            - kind: string
+  nthChild:
+    position: 1
+    ofRule:
+      not:
+        kind: comment

@@ -1,0 +1,19 @@
+---
+description: When to share pytest setup and how to name fixtures
+globs: "**/tests/**/*.py, **/test_*.py, **/conftest.py"
+alwaysApply: false
+---
+
+# Pytest fixtures
+
+- Consolidate repeated setup, including identical object construction and filesystem setup, into shared fixtures. Keep case-specific setup visible in the test or its parameters.
+- Name a value fixture for what it returns. Name an action fixture with a leading underscore and a verb phrase such as `_write_settings_file`. When both are useful, let the value fixture depend on the action fixture.
+- Keep a factory-callable fixture when tests need different arguments. For a single reusable value, return the configured instance.
+- Keep `conftest.py` for fixtures and pytest hooks. Put plain helper functions in a `helpers.py` next to it, and import them from there.
+- Express fixture dependencies explicitly when setup order matters. If a dependency parameter has no other use, explain the ordering when suppressing an unused-argument diagnostic.
+
+Why: explicit dependencies keep setup order readable. Names tell the reader whether a fixture returns a value or performs an action, and a separate helpers module keeps conftest.py readable as a list of fixtures.
+
+## Checks
+- enforced-by: conftest-has-only-fixtures
+- enforcement: llm-review

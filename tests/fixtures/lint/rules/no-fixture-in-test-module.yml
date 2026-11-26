@@ -1,0 +1,16 @@
+id: no-fixture-in-test-module
+language: Python
+severity: warning
+message: Move the fixture to the conftest.py next to this test module
+note: |
+  A fixture in a test module cannot be shared, so the next test file that needs it
+  copies it. conftest.py is where pytest looks for shared setup.
+files:
+  - "**/test_*.py"
+rule:
+  kind: decorator
+  any:
+    - pattern: "@pytest.fixture"
+    - pattern: "@pytest.fixture($$$)"
+    - pattern: "@fixture"
+    - pattern: "@fixture($$$)"

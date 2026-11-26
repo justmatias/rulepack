@@ -1,0 +1,21 @@
+---
+description: Tests that are reliable, specific and test behavior
+globs: "**/tests/**/*.py, **/test_*.py"
+alwaysApply: false
+---
+
+# Tests
+
+- Don't sleep in tests. Wait for the condition you need, or inject a fake clock.
+- `pytest.raises` names the exact exception you expect, never `Exception` or `BaseException`.
+- Every `skip` and `xfail` says why (`reason="..."`).
+- One behavior per test, and its name says which: `test_<behavior>_when_<condition>`.
+- Test public behavior, not private helpers or internals.
+- Unit tests don't reach the network or the real clock.
+- Delete a test that cannot fail, such as one that only asserts a mock it just configured.
+- Give a test module a local `conftest.py` when its setup needs a scope of its own. Keep fixtures shared by sibling modules in the parent `conftest.py`.
+
+Why: sleeps make tests slow and flaky; a broad `pytest.raises` passes on the wrong error; an unexplained skip is never revisited; tests tied to internals break on refactors and can miss regressions. Keep specialized setup near the tests that use it.
+
+## Checks
+- enforcement: llm-review

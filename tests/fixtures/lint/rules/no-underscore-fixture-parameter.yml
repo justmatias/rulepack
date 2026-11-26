@@ -1,0 +1,22 @@
+id: no-underscore-fixture-parameter
+language: Python
+severity: error
+message: Apply an action fixture with @pytest.mark.usefixtures("_name"), not as a test parameter
+note: |
+  An underscore fixture only acts. Taking it as a parameter leaves an unused
+  argument; usefixtures shows at the call site that it is there for its side effect.
+files:
+  - "**/test_*.py"
+rule:
+  kind: identifier
+  regex: "^_"
+  inside:
+    kind: parameters
+    stopBy:
+      not:
+        kind: typed_parameter
+    inside:
+      kind: function_definition
+      has:
+        field: name
+        regex: "^test_"

@@ -1,0 +1,15 @@
+# The sample repo's .pre-commit-config.yaml: one remote and one local hook, for
+# `enforced-by-hook:` in coverage.
+repos:
+  - repo: https://github.com/gitleaks/gitleaks
+    rev: v8.30.0
+    hooks:
+      - id: gitleaks
+
+  - repo: local
+    hooks:
+      - id: lint-rules
+        name: lint-rules
+        entry: make lint-rules
+        language: system
+        pass_filenames: false

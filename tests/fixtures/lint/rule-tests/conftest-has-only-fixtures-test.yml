@@ -1,0 +1,34 @@
+id: conftest-has-only-fixtures
+valid:
+  - |
+    @pytest.fixture
+    def item():
+        return Item()
+  - |
+    @pytest.fixture(params=["a", "b"])
+    def name(request):
+        return request.param
+  # Near miss: a pytest hook is a plain function by design.
+  - |
+    def pytest_configure(config):
+        config.addinivalue_line("markers", "slow")
+  # Near miss: a function nested inside a fixture.
+  - |
+    @pytest.fixture
+    def handler():
+        def on_event(event):
+            return event
+
+        return on_event
+invalid:
+  - |
+    def write_file(path, content):
+        path.write_text(content)
+  - |
+    def _settings_json(plugin_id):
+        return json.dumps({plugin_id: {}})
+
+
+    @pytest.fixture
+    def settings(tmp_path):
+        return _settings_json("demo")

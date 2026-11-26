@@ -1,0 +1,18 @@
+---
+description: Naming and function size guidelines
+globs: "**/*.py"
+alwaysApply: false
+---
+
+# Naming
+
+- Use descriptive names. Spell words out instead of abbreviating them.
+- Extract a compound condition into a descriptive local before passing it as a keyword argument when the name explains what the condition means.
+- Omit the leading underscore on classes introduced as named result models.
+- Name a function for its action: a verb phrase that says what it does and returns (`parse_server_entries`, not `server_entries`). A noun-only name hides the intent.
+- A function does one thing. If its name needs "and", split it.
+
+Why: code is read far more often than it is written.
+
+## Checks
+- enforcement: llm-review

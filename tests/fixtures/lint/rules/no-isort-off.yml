@@ -1,0 +1,10 @@
+id: no-isort-off
+language: Python
+severity: error
+message: "Break the import cycle by importing from the defining submodule, not with `isort: off`"
+note: |
+  Reordering imports changes only the initialization order, not the import graph,
+  so the cycle stays and a formatter can bring the ImportError back later.
+rule:
+  kind: comment
+  regex: "^#\\s*isort:\\s*(off|on)\\s*$"

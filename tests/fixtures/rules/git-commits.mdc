@@ -1,0 +1,26 @@
+---
+description: Commits and commit messages
+alwaysApply: true
+license: Apache-2.0
+metadata:
+  adapted-from: "skills/commit-hygiene in Gentleman-Programming/engram (https://github.com/Gentleman-Programming/engram/tree/11521f4f3776db6d94dc17c11731bad35b71c7bc/skills/commit-hygiene). Thanks to Alan Buscaglia for the original."
+  upstream-commit: "11521f4f3776db6d94dc17c11731bad35b71c7bc"
+  upstream-license: "Apache-2.0, declared in the skill's frontmatter (the root LICENSE is MIT, Copyright (c) 2026 Alan Buscaglia), https://github.com/Gentleman-Programming/engram/blob/11521f4f3776db6d94dc17c11731bad35b71c7bc/skills/commit-hygiene/SKILL.md"
+---
+
+# Git commits
+
+- Commit subjects follow Conventional Commits: `type(scope)!: summary`, with a type from the repo's allowed list.
+- The subject is at most 72 characters, in the imperative mood ("add", not "added"), with no trailing period.
+- When there is a body, separate it from the subject with a blank line, and explain why the change was made, not what it does.
+- One logical change per commit.
+- Never commit secrets, keys or local settings files.
+- Never commit directly to the default branch; branch first.
+- Name each branch you create `type/short-description`: a type from the commit type list, then lowercase words joined by hyphens.
+- Don't force-push shared branches.
+- Never add AI attribution to commits or pull requests. Omit agent or model co-author trailers and generated-with footers.
+
+Why: a consistent history is what release tooling, reviewers and agents reading `git log` rely on; a secret pushed once must be rotated; a typed branch name tells reviewers what a branch holds before they open it; direct commits and force-pushes skip review and rewrite what others built on; the author of record owns the change.
+
+## Checks
+- enforcement: llm-review

@@ -1,0 +1,23 @@
+id: test-name-has-when-condition
+language: Python
+severity: warning
+message: Name tests test_<behavior>_when_<condition>
+note: State the tested behavior and the condition that exercises it.
+files:
+  - "**/test_*.py"
+rule:
+  all:
+    - kind: function_definition
+    - has:
+        field: name
+        regex: "^test_"
+    - not:
+        has:
+          field: name
+          regex: "_when_"
+  inside:
+    any:
+      - kind: module
+      - kind: decorated_definition
+        inside:
+          kind: module
