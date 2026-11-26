@@ -1,0 +1,6 @@
+# Where this repo keeps its checks (written by `rulepack init`). Every `rulepack`
+# command reads this file; run `rulepack config` to see the resolved values.
+sgconfig = "{{checks_dir}}/sgconfig.yml"
+
+[scan]
+exclude = []

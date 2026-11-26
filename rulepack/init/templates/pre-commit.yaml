@@ -1,0 +1,6 @@
+- repo: https://github.com/justmatias/rulepack
+  rev: v{{version}}
+  hooks:
+    - id: rulepack-lint
+    - id: rulepack-rules
+    - id: rulepack-imports
