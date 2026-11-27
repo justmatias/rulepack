@@ -126,3 +126,15 @@ def test_init_leaves_layout_as_it_is_when_config_exists(run_init, git_repository
     )
     assert not (git_repository / "lint-rules").exists()
     assert "already exists" in completed.stderr
+
+
+def test_init_reports_an_error_when_pre_commit_config_is_not_valid_yaml(
+    run_init, git_repository
+):
+    (git_repository / ".pre-commit-config.yaml").write_text("repos:\n  - [unclosed\n")
+
+    completed = run_init("--yes", "--pre-commit")
+
+    assert completed.returncode == 2
+    assert "rulepack init:" in completed.stderr
+    assert "Traceback" not in completed.stderr

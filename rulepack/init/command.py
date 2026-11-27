@@ -113,7 +113,10 @@ def append_pre_commit_entry(text: str, entry: str) -> str:
         for line in entry.splitlines()
     ]
     updated = "\n".join([*lines[:end], *block, *lines[end:]]) + "\n"
-    before = (yaml.safe_load(text) or {}).get("repos") or []
+    try:
+        before = (yaml.safe_load(text) or {}).get("repos") or []
+    except yaml.YAMLError as error:
+        raise InitError(f"{PRE_COMMIT_CONFIG} is not valid YAML: {error}") from error
     after = (yaml.safe_load(updated) or {}).get("repos") or []
     if len(after) != len(before) + 1 or after[: len(before)] != before:
         raise InitError(f"could not append the rulepack hooks to {PRE_COMMIT_CONFIG}")
