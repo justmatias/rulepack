@@ -2,6 +2,24 @@
 
 <!-- version list -->
 
+## v0.5.0 (2026-11-27)
+
+### Bug Fixes
+
+- **init**: Report a malformed pre-commit config instead of crashing
+  ([`a0d3f16`](https://github.com/justmatias/rulepack/commit/a0d3f16949f110bb9eb2ea96ce94855477eb67ed))
+
+### Features
+
+- **init**: Scaffold the rules-as-checks layout with rulepack init
+  ([`f4fa135`](https://github.com/justmatias/rulepack/commit/f4fa13520a49ab00ffa8a38e1bc022d9ed94c7eb))
+
+### Refactoring
+
+- **init**: Check the existing layout paths directly
+  ([`fc056f5`](https://github.com/justmatias/rulepack/commit/fc056f53a961c8c10e4a8c6c6b5200af82ad230e))
+
+
 ## v0.4.0 (2026-11-26)
 
 ### Features
