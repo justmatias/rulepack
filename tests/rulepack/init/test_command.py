@@ -22,9 +22,9 @@ def test_init_creates_a_layout_that_passes_lint_when_repo_is_empty(
     assert completed.returncode == 0, completed.stderr
     assert sorted(read_tree(git_repository)) == [
         ".rulepack.toml",
-        "lint-rules/rule-tests/.gitkeep",
-        "lint-rules/rules/.gitkeep",
-        "lint-rules/sgconfig.yml",
+        "lint/rule-tests/.gitkeep",
+        "lint/rules/.gitkeep",
+        "lint/sgconfig.yml",
     ]
     assert "lint: scan OK" in completed.stderr
 
@@ -124,7 +124,7 @@ def test_init_leaves_layout_as_it_is_when_config_exists(run_init, git_repository
     assert (git_repository / ".rulepack.toml").read_text() == (
         'sgconfig = "checks/sg.yml"\n'
     )
-    assert not (git_repository / "lint-rules").exists()
+    assert not (git_repository / "lint").exists()
     assert "already exists" in completed.stderr
 
 

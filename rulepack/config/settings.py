@@ -25,7 +25,7 @@ class HookSettings(StrictModel):
 
 
 class ProjectConfig(StrictModel):
-    sgconfig: Path = Path("lint-rules/sgconfig.yml")
+    sgconfig: Path = Path("lint/sgconfig.yml")
     importlinter: Path = Path(".importlinter")
     scan: ScanSettings = ScanSettings()
     hooks: HookSettings = HookSettings()

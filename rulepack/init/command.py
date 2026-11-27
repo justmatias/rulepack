@@ -174,7 +174,7 @@ def plan_makefile(root: Path) -> PlannedFile:
 
 
 def find_existing_layout(root: Path) -> Path | None:
-    candidates = (root / CONFIG_FILE_NAME, root / "lint-rules" / "sgconfig.yml")
+    candidates = (root / CONFIG_FILE_NAME, root / "lint" / "sgconfig.yml")
     return next((path for path in candidates if path.is_file()), None)
 
 
@@ -233,9 +233,7 @@ def parse_arguments(argv: list[str] | None) -> argparse.Namespace:
             "for confirmation; never overwrites a file."
         ),
     )
-    parser.add_argument(
-        "--checks-dir", type=parse_relative_folder, default="lint-rules"
-    )
+    parser.add_argument("--checks-dir", type=parse_relative_folder, default="lint")
     parser.add_argument(
         "--pre-commit",
         action="store_true",
