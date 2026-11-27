@@ -37,7 +37,9 @@ All of the enforcement logic lives in mstack's `src/mstack/`: the ast-grep scan,
 
 **Prose is in scope.** `coverage` reads each prose rule's frontmatter (`enforced-by`, `globs`, credit) to prove that rules and checks point to each other. So rulepack reads `.mdc` frontmatter. It never renders or installs prose; that stays in mstack. `split_frontmatter` and `credit_problems` exist in both repos, about 40 lines each side. A shared library for that much code would be a third package to release.
 
-**Config.** `.rulepack.toml` has the same keys as `.mstack.toml` today, minus the pack keys: `rules_dir`, `sgconfig`, `importlinter`, `pre_commit_config`, `[scan]`, `[hooks]`, `[domain_check]`, `[changed]`. `[commits]` stays in mstack with its commit-message check. The lookup and precedence rules are the same: defaults, then the file, then flags. `rulepack` ignores `.mstack.toml`. A repo that still has one with lint keys gets an error that tells it to rename the file.
+**Config.** `.rulepack.toml` has the same keys as `.mstack.toml` today, minus the pack keys and `rules_dir` (rulepack never reads prose from a folder of its own): `sgconfig`, `importlinter`, `pre_commit_config`, `[scan]`, `[hooks]`, `[domain_check]`, `[changed]`. `[commits]` stays in mstack with its commit-message check. The lookup and precedence rules are the same: defaults, then the file, then flags. `rulepack` ignores `.mstack.toml`. A repo that still has one with lint keys gets an error that tells it to rename the file.
+
+**Local checks are optional.** A repo either consumes checks kept in another repository and carries only `.rulepack.toml`, or also keeps its own checks next to the code. `sgconfig` defaults to `lint/sgconfig.yml`. When that default file is missing, `rulepack lint` skips the ast-grep rule tests and scan instead of failing; a `sgconfig` the config names must exist. `rulepack init` writes only `.rulepack.toml`, and `--checks-dir <folder>` also writes the sgconfig with empty `rules/` and `rule-tests/`. Without the flag, a person at a terminal is asked whether to keep checks in `lint/`; `--yes`, `--dry-run`, scripts and agents get the config-only default. `init` writes no prose rules folder: prose stays with mstack's `sync` skill.
 
 **Agent hooks** run in repos with `.rulepack.toml`, where they previously needed `.mstack.toml`.
 
@@ -93,4 +95,4 @@ All of the enforcement logic lives in mstack's `src/mstack/`: the ast-grep scan,
 
 ## Open questions
 
-- Whether `rulepack init` keeps scaffolding a prose rules folder, or leaves prose to mstack's `sync` skill and only writes `.rulepack.toml`, the sgconfig and CI.
+None.

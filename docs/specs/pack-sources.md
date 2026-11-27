@@ -76,7 +76,7 @@ A source has exactly one of `git` or `path`, and packs are always selected as `<
 - `lint.py`: pack checks and pack rule tests next to local ones, a temporary sgconfig, overrides, and the clash rules.
 - `hooks.py`: skip uncached sources.
 - `coverage.py`: resolve `enforced-by:` against pack checks.
-- `init.py` and its templates: `--source <name>=<git url>@<ref>` writes a `[sources]` block and the lock.
+- `init.py` and its templates: `--source <name>=<git url>@<ref>` writes a `[sources]` block and the lock. A person at a terminal who answers no to keeping checks in `lint/` is asked for the source next.
 - This repo's `.rulepack.toml`, `rulepack.lock` and `.pre-commit-config.yaml`: self-lint through `[sources.mstack]`.
 - In mstack: `packs.toml`.
 
