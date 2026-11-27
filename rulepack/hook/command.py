@@ -1,35 +1,67 @@
 import argparse
+import hashlib
 import json
 import logging
 import subprocess
 import sys
+import tempfile
 import time
+from collections.abc import Callable
+from enum import IntEnum
+from functools import partial
 from pathlib import Path
+from typing import Self
 
+from pydantic import BaseModel, TypeAdapter
+
+from rulepack.config import ConfigError, ResolvedConfig, resolve_config
 from rulepack.config.project_paths import find_config_path, find_git_root
+from rulepack.hook.payload import HookPayload
+from rulepack.lint.command import ScanFinding, StepResult, select_files
 
 logger = logging.getLogger(__name__)
 
-
-def hook_directory(payload: dict) -> Path:
-    directory = payload.get("cwd")
-    if isinstance(directory, str) and directory:
-        return Path(directory).resolve()
-    workspaces = payload.get("workspace_roots")
-    edited = payload.get("file_path")
-    if isinstance(workspaces, list) and isinstance(edited, str):
-        path = Path(edited).resolve()
-        for workspace in workspaces:
-            if isinstance(workspace, str) and path.is_relative_to(
-                root := Path(workspace).resolve()
-            ):
-                return root
-    return Path.cwd()
+# `rulepack lint` exits 1 when a check fails, and with any other code when it cannot run.
+LINT_EXIT_CODES = (0, 1)
+LINT_RESULTS = TypeAdapter(dict[str, StepResult])
 
 
-def lint_findings(root: Path, arguments: list[str], timeout: float) -> list[str]:
-    import tempfile  # pylint: disable=import-outside-toplevel
+class HookExit(IntEnum):
+    QUIET = 0
+    # Agents show a hook's stderr to the model when it exits 2.
+    REPORT = 2
 
+
+class StopMarker(BaseModel):
+    """The findings a session's stop hook last reported, kept in a temp file."""
+
+    path: Path
+
+    @classmethod
+    def for_session(cls, root: Path, session: str) -> Self:
+        key = hashlib.sha256(json.dumps([str(root), session]).encode()).hexdigest()
+        return cls(path=Path(tempfile.gettempdir()) / f"rulepack-stop-{key}")
+
+    @staticmethod
+    def _digest(findings: list[str]) -> bytes:
+        return hashlib.sha256(json.dumps(findings).encode()).hexdigest().encode()
+
+    def holds(self, findings: list[str]) -> bool:
+        return self.path.is_file() and self.path.read_bytes() == self._digest(findings)
+
+    def record(self, findings: list[str]) -> None:
+        with tempfile.NamedTemporaryFile(
+            dir=self.path.parent, delete_on_close=False
+        ) as pending:
+            pending.write(self._digest(findings))
+            pending.close()
+            Path(pending.name).replace(self.path)
+
+    def clear(self) -> None:
+        self.path.unlink(missing_ok=True)
+
+
+def run_lint(root: Path, arguments: list[str], timeout: float) -> dict[str, StepResult]:
     command = [sys.executable, "-P", "-m", "rulepack", "lint", "--json", *arguments]
     # Files let a timed-out lint process return without waiting for a child's pipes.
     with tempfile.TemporaryFile() as output, tempfile.TemporaryFile() as errors:
@@ -41,86 +73,93 @@ def lint_findings(root: Path, arguments: list[str], timeout: float) -> list[str]
             timeout=timeout,
             check=False,
         )
-        output.seek(0)
-        errors.seek(0)
-        if completed.returncode not in (0, 1):
+        if completed.returncode not in LINT_EXIT_CODES:
+            errors.seek(0)
             raise RuntimeError(errors.read().decode("utf-8", errors="replace").strip())
-        results = json.load(output)
-
-    findings = []
-    for step, result in results.items():
-        if result["ok"]:
-            continue
-        for finding in result["findings"] or [f"{step} failed"]:
-            message = (
-                f"{finding['file']}:{finding['line']}: "
-                f"{finding['rule']}: {finding['message']}"
-                if isinstance(finding, dict)
-                else finding
-            )
-            findings.append(message)
-    return sorted(set(findings))
+        output.seek(0)
+        return LINT_RESULTS.validate_json(output.read())
 
 
-def repeated_stop(root: Path, session: str, findings: list[str]) -> bool:
-    import hashlib  # pylint: disable=import-outside-toplevel
-    import tempfile  # pylint: disable=import-outside-toplevel
-
-    key = hashlib.sha256(json.dumps([str(root), session]).encode()).hexdigest()
-    marker = Path(tempfile.gettempdir()) / f"rulepack-stop-{key}"
-    if not findings:
-        marker.unlink(missing_ok=True)
-        return False
-    digest = hashlib.sha256(json.dumps(findings).encode()).hexdigest()
-    if marker.is_file() and marker.read_bytes() == digest.encode():
-        return True
-    with tempfile.NamedTemporaryFile(
-        dir=marker.parent, delete_on_close=False
-    ) as pending:
-        pending.write(digest.encode())
-        pending.close()
-        Path(pending.name).replace(marker)
-    return False
+def format_finding(finding: ScanFinding | str) -> str:
+    if isinstance(finding, str):
+        return finding
+    return f"{finding.file}:{finding.line}: {finding.rule}: {finding.message}"
 
 
-def patch_paths(patch: str) -> list[str]:
-    paths: list[str] = []
-    updating = False
-    for line in patch.split("\n"):
-        # Leading whitespace in an update hunk marks unchanged file content.
-        header, _, path = (line.rstrip() if updating else line.strip()).partition(": ")
-        if not path:
-            continue
-        match header:
-            case "*** Update File":
-                paths.append(path)
-                updating = True
-            case "*** Add File":
-                paths.append(path)
-                updating = False
-            case "*** Delete File":
-                updating = False
-            case "*** Move to" if updating:
-                paths[-1] = path
-    return paths
+def list_findings(results: dict[str, StepResult]) -> list[str]:
+    return sorted({
+        format_finding(finding)
+        for step, result in results.items()
+        if not result.ok
+        for finding in result.findings or [f"{step} failed"]
+    })
 
 
-def edited_paths(directory: Path, payload: dict) -> list[Path]:
-    tool_input = payload.get("tool_input")
-    if payload.get("tool_name") == "apply_patch" and isinstance(tool_input, dict):
-        patch = tool_input.get("command")
-        if isinstance(patch, str):
-            return [(directory / path).resolve() for path in patch_paths(patch)]
+def resolve_hook_config(root: Path) -> ResolvedConfig | None:
+    """The project's config, when it has a config file that leaves hooks enabled."""
+    config = resolve_config(start=root)
+    hooks_enabled = config.file is not None and config.values.hooks.enabled
+    return config if hooks_enabled else None
+
+
+def lint_within_budget(
+    config: ResolvedConfig, arguments: list[str], started: float
+) -> list[str]:
+    """Lint with what is left of the hook's time budget, which starts at `started`."""
+    budget = config.values.hooks.timeout
+    remaining = budget - (time.monotonic() - started)
+    if remaining <= 0:
+        raise subprocess.TimeoutExpired("rulepack lint", budget)
+    return list_findings(run_lint(config.root, arguments, remaining))
+
+
+def find_edited_file_findings(
+    root: Path, edited: list[Path], started: float
+) -> list[str]:
+    config = resolve_hook_config(root)
+    files = select_files(config, edited) if config else []
+    if config is None or not files:
         return []
-    path = (
-        tool_input.get("file_path")
-        if isinstance(tool_input, dict)
-        else payload.get("file_path")
-    )
-    return [(directory / path).resolve()] if isinstance(path, str) and path else []
+    arguments = ["--files", *[str(path) for path in files], "--only", "scan"]
+    return lint_within_budget(config, arguments, started)
 
 
-def edited_projects(directory: Path, paths: list[Path]) -> dict[Path, list[Path]]:
+def find_new_stop_findings(root: Path, session: str, started: float) -> list[str]:
+    """The changed files' findings, unless this session's last stop reported them."""
+    config = resolve_hook_config(root)
+    if config is None:
+        return []
+    findings = lint_within_budget(config, ["--changed", "--only", "scan"], started)
+    marker = StopMarker.for_session(config.root, session)
+    if not findings:
+        marker.clear()
+    elif marker.holds(findings):
+        return []
+    else:
+        marker.record(findings)
+    return findings
+
+
+def report_findings(find: Callable[[], list[str]]) -> HookExit:
+    """Write the findings `find` returns to stderr; a failed check stays quiet."""
+    try:
+        findings = find()
+    except subprocess.TimeoutExpired:
+        logger.warning("rulepack hook: timed out (time budget exhausted)")
+        return HookExit.QUIET
+    except (ConfigError, OSError, RuntimeError, ValueError) as error:
+        logger.warning("rulepack hook: %s", error)
+        return HookExit.QUIET
+    if not findings:
+        return HookExit.QUIET
+    sys.stderr.write("\n".join(findings) + "\n")
+    return HookExit.REPORT
+
+
+def group_paths_by_project(
+    directory: Path, paths: list[Path]
+) -> dict[Path, list[Path]]:
+    """The edited paths inside the workspace, keyed by the project config's folder."""
     workspace = find_git_root(directory) or directory
     projects: dict[Path, list[Path]] = {}
     for path in paths:
@@ -134,46 +173,26 @@ def edited_projects(directory: Path, paths: list[Path]) -> dict[Path, list[Path]
     return projects
 
 
-def check_hook(
-    directory: Path, edited: list[Path] | None, session: str, started: float
-) -> int:
-    # Keep the unrelated-repo path free of lint and validation imports.
-    # pylint: disable=import-outside-toplevel
-    from rulepack.config import ConfigError, resolve_config
-    from rulepack.lint.command import select_files
+def check_post_edit(payload: HookPayload, started: float) -> HookExit:
+    directory = payload.resolve_directory()
+    projects = group_paths_by_project(directory, payload.list_edited_paths(directory))
+    return max(
+        (
+            report_findings(partial(find_edited_file_findings, root, paths, started))
+            for root, paths in projects.items()
+        ),
+        default=HookExit.QUIET,
+    )
 
-    try:
-        config = resolve_config(start=directory)
-        settings = config.values.hooks
-        if config.file is None or not settings.enabled:
-            return 0
-        if edited is None:
-            arguments = ["--changed", "--only", "scan"]
-        else:
-            paths = select_files(config, edited)
-            if not paths:
-                return 0
-            arguments = [
-                "--files",
-                *[str(path) for path in paths],
-                "--only",
-                "scan",
-            ]
-        remaining = settings.timeout - (time.monotonic() - started)
-        if remaining <= 0:
-            raise subprocess.TimeoutExpired("rulepack lint", settings.timeout)
-        findings = lint_findings(config.root, arguments, remaining)
-        if edited is None and repeated_stop(config.root, session, findings):
-            return 0
-    except subprocess.TimeoutExpired:
-        logger.warning("rulepack hook: timed out (time budget exhausted)")
-        return 0
-    except (ConfigError, OSError, RuntimeError, ValueError) as error:
-        logger.warning("rulepack hook: %s", error)
-        return 0
-    if findings:
-        sys.stderr.write("\n".join(findings) + "\n")
-    return 2 if findings else 0
+
+def check_stop(payload: HookPayload, started: float) -> HookExit:
+    directory = payload.resolve_directory()
+    config = find_config_path(directory, find_git_root(directory))
+    if config is None:
+        return HookExit.QUIET
+    return report_findings(
+        partial(find_new_stop_findings, config.parent, payload.session_id, started)
+    )
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -183,23 +202,9 @@ def main(argv: list[str] | None = None) -> int:
     )
     parser.add_argument("event", choices=("post-edit", "stop"))
     event = parser.parse_args(argv).event
+    check = check_post_edit if event == "post-edit" else check_stop
     try:
-        payload = json.load(sys.stdin)
-        if not isinstance(payload, dict):
-            return 0
-        directory = hook_directory(payload)
-        session = str(payload.get("session_id", ""))
-        if event == "post-edit":
-            projects = edited_projects(directory, edited_paths(directory, payload))
-            return max(
-                (
-                    check_hook(root, paths, session, started)
-                    for root, paths in projects.items()
-                ),
-                default=0,
-            )
-        if config := find_config_path(directory, find_git_root(directory)):
-            return check_hook(config.parent, None, session, started)
+        return check(HookPayload.model_validate_json(sys.stdin.read()), started)
     except (OSError, RuntimeError, ValueError) as error:
         logger.warning("rulepack hook: %s", error)
-    return 0
+        return HookExit.QUIET
