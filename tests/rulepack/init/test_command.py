@@ -148,3 +148,21 @@ def test_init_reports_an_error_when_pre_commit_config_is_not_valid_yaml(
     assert completed.returncode == 2
     assert "rulepack init:" in completed.stderr
     assert "Traceback" not in completed.stderr
+
+
+def test_init_creates_local_checks_when_terminal_user_keeps_checks_here(
+    run_init_in_terminal, git_repository
+):
+    exit_code = run_init_in_terminal(answers="y\ny\n")
+
+    assert exit_code == 0
+    assert (git_repository / "lint" / "sgconfig.yml").is_file()
+
+
+def test_init_writes_only_config_when_terminal_user_keeps_checks_elsewhere(
+    run_init_in_terminal, git_repository
+):
+    exit_code = run_init_in_terminal(answers="n\ny\n")
+
+    assert exit_code == 0
+    assert list(read_tree(git_repository)) == [".rulepack.toml"]
