@@ -9,8 +9,8 @@ from typing import Literal
 
 import yaml
 
-from rulepack.config import StrictModel
-from rulepack.config.project_paths import find_config_path, find_git_root
+from rulepack.config import CONFIG_FILE_NAME, StrictModel
+from rulepack.config.project_paths import find_git_root
 from rulepack.lint.command import main as run_lint
 
 logger = logging.getLogger(__name__)
@@ -66,7 +66,7 @@ def plan_layout(root: Path, checks_dir: str) -> list[PlannedFile]:
     checks = root / checks_dir
     return [
         plan_new_file(
-            root / ".rulepack.toml",
+            root / CONFIG_FILE_NAME,
             render_template("rulepack.toml", checks_dir=checks_dir),
         ),
         plan_new_file(checks / "sgconfig.yml", render_template("sgconfig.yml")),
@@ -171,10 +171,8 @@ def plan_makefile(root: Path) -> PlannedFile:
 
 
 def find_existing_layout(root: Path) -> Path | None:
-    if config_path := find_config_path(root, find_git_root(root)):
-        return config_path
-    default_sgconfig = root / "lint-rules" / "sgconfig.yml"
-    return default_sgconfig if default_sgconfig.is_file() else None
+    candidates = (root / CONFIG_FILE_NAME, root / "lint-rules" / "sgconfig.yml")
+    return next((path for path in candidates if path.is_file()), None)
 
 
 def build_plan(root: Path, arguments: argparse.Namespace) -> list[PlannedFile]:
