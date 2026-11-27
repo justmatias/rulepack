@@ -2,6 +2,28 @@
 
 <!-- version list -->
 
+## v0.6.0 (2026-11-27)
+
+### Documentation
+
+- **specs**: Record the config-only init and close its open question
+  ([`3d08a02`](https://github.com/justmatias/rulepack/commit/3d08a023a30421101fae6963aef3a000750576a9))
+
+### Features
+
+- **config**: Default the checks folder to lint/
+  ([`9c624fb`](https://github.com/justmatias/rulepack/commit/9c624fb2cdde60c7fd3795c6a75d566774cd0bbb))
+
+- **init**: Ask a person at a terminal whether to keep checks locally
+  ([`002975b`](https://github.com/justmatias/rulepack/commit/002975bb788a51a47d0d82ebe35b496f6a2234c3))
+
+- **init**: Write only .rulepack.toml unless --checks-dir is given
+  ([`0c95a42`](https://github.com/justmatias/rulepack/commit/0c95a42c915cd7b4c9ca31bd47d16885b8c332f6))
+
+- **lint**: Skip the ast-grep steps when the repo has no local checks
+  ([`02a6041`](https://github.com/justmatias/rulepack/commit/02a6041f66629e89e0203252f818ea21f4032902))
+
+
 ## v0.5.0 (2026-11-27)
 
 ### Bug Fixes

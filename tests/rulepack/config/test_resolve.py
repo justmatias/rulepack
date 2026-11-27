@@ -10,7 +10,7 @@ def test_config_uses_defaults_when_file_is_missing(git_repository: Path):
 
     assert config.file is None
     assert config.root == git_repository
-    assert config.values.sgconfig == git_repository / "lint-rules/sgconfig.yml"
+    assert config.values.sgconfig == git_repository / "lint/sgconfig.yml"
     assert set(config.sources.values()) == {"default"}
 
 
@@ -85,4 +85,4 @@ def test_config_is_not_found_when_it_is_above_the_git_root(git_repository: Path)
     config = resolve_config(start=git_repository)
 
     assert config.file is None
-    assert config.values.sgconfig == git_repository / "lint-rules/sgconfig.yml"
+    assert config.values.sgconfig == git_repository / "lint/sgconfig.yml"

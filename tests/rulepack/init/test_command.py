@@ -14,17 +14,27 @@ USER_PRE_COMMIT = (
 )
 
 
-def test_init_creates_a_layout_that_passes_lint_when_repo_is_empty(
+def test_init_writes_only_a_config_that_passes_lint_when_checks_dir_is_not_given(
     run_init, git_repository
 ):
     completed = run_init("--yes")
 
     assert completed.returncode == 0, completed.stderr
+    assert list(read_tree(git_repository)) == [".rulepack.toml"]
+    assert "sgconfig" not in (git_repository / ".rulepack.toml").read_text()
+
+
+def test_init_creates_local_checks_that_pass_lint_when_checks_dir_is_given(
+    run_init, git_repository
+):
+    completed = run_init("--yes", "--checks-dir", "lint")
+
+    assert completed.returncode == 0, completed.stderr
     assert sorted(read_tree(git_repository)) == [
         ".rulepack.toml",
-        "lint-rules/rule-tests/.gitkeep",
-        "lint-rules/rules/.gitkeep",
-        "lint-rules/sgconfig.yml",
+        "lint/rule-tests/.gitkeep",
+        "lint/rules/.gitkeep",
+        "lint/sgconfig.yml",
     ]
     assert "lint: scan OK" in completed.stderr
 
@@ -119,12 +129,12 @@ def test_init_writes_the_plan_when_confirmed(run_init, git_repository):
 def test_init_leaves_layout_as_it_is_when_config_exists(run_init, git_repository):
     (git_repository / ".rulepack.toml").write_text('sgconfig = "checks/sg.yml"\n')
 
-    completed = run_init("--yes")
+    completed = run_init("--yes", "--checks-dir", "lint")
 
     assert (git_repository / ".rulepack.toml").read_text() == (
         'sgconfig = "checks/sg.yml"\n'
     )
-    assert not (git_repository / "lint-rules").exists()
+    assert not (git_repository / "lint").exists()
     assert "already exists" in completed.stderr
 
 
@@ -138,3 +148,21 @@ def test_init_reports_an_error_when_pre_commit_config_is_not_valid_yaml(
     assert completed.returncode == 2
     assert "rulepack init:" in completed.stderr
     assert "Traceback" not in completed.stderr
+
+
+def test_init_creates_local_checks_when_terminal_user_keeps_checks_here(
+    run_init_in_terminal, git_repository
+):
+    exit_code = run_init_in_terminal(answers="y\ny\n")
+
+    assert exit_code == 0
+    assert (git_repository / "lint" / "sgconfig.yml").is_file()
+
+
+def test_init_writes_only_config_when_terminal_user_keeps_checks_elsewhere(
+    run_init_in_terminal, git_repository
+):
+    exit_code = run_init_in_terminal(answers="n\ny\n")
+
+    assert exit_code == 0
+    assert list(read_tree(git_repository)) == [".rulepack.toml"]

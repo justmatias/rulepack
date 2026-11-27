@@ -1,3 +1,4 @@
+import json
 import shutil
 import sys
 import sysconfig
@@ -137,3 +138,28 @@ def test_find_tool_returns_bundled_ast_grep_when_it_is_installed():
         Path(sysconfig.get_path("scripts")),
         Path(sys.executable).parent,
     }
+
+
+def test_ast_grep_steps_are_skipped_when_repo_has_no_local_checks(
+    run_rulepack, git_repository: Path
+):
+    completed = run_rulepack(
+        "lint", "--json", "--only", "test", "scan", working_directory=git_repository
+    )
+
+    assert completed.returncode == 0, completed.stderr
+    skipped = {step["skipped"] for step in json.loads(completed.stdout).values()}
+    assert skipped == {"no local checks at lint/sgconfig.yml"}
+
+
+def test_lint_fails_when_configured_sgconfig_is_missing(
+    run_rulepack, git_repository: Path, write_config
+):
+    write_config('sgconfig = "checks/sgconfig.yml"\n')
+
+    completed = run_rulepack(
+        "lint", "--json", "--only", "scan", working_directory=git_repository
+    )
+
+    assert completed.returncode == 1
+    assert "no ast-grep config" in completed.stdout

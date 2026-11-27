@@ -19,6 +19,7 @@ Action = Literal["create", "append", "exists, skipped"]
 RULEPACK_REPOSITORY = "https://github.com/justmatias/rulepack"
 PRE_COMMIT_CONFIG = ".pre-commit-config.yaml"
 WORKFLOW = Path(".github/workflows/rulepack.yml")
+DEFAULT_CHECKS_DIR = "lint"
 MAKEFILE_TARGET = re.compile(r"^(?P<target>[A-Za-z0-9_.-]+)\s*:(?!=)", re.MULTILINE)
 TOP_LEVEL_KEY = re.compile(r"^[^\s#-][^:]*:")
 LIST_ITEM = re.compile(r"^(?P<indent>\s*)-\s")
@@ -62,13 +63,18 @@ def plan_new_file(path: Path, content: str) -> PlannedFile:
     return PlannedFile(path=path, action="create", content=content)
 
 
-def plan_layout(root: Path, checks_dir: str) -> list[PlannedFile]:
+def plan_layout(root: Path, checks_dir: str | None) -> list[PlannedFile]:
+    """The config, plus a local checks folder when the repo keeps its own checks."""
+    local_checks = f'sgconfig = "{checks_dir}/sgconfig.yml"\n\n' if checks_dir else ""
+    config = plan_new_file(
+        root / CONFIG_FILE_NAME,
+        render_template("rulepack.toml", local_checks=local_checks),
+    )
+    if checks_dir is None:
+        return [config]
     checks = root / checks_dir
     return [
-        plan_new_file(
-            root / CONFIG_FILE_NAME,
-            render_template("rulepack.toml", checks_dir=checks_dir),
-        ),
+        config,
         plan_new_file(checks / "sgconfig.yml", render_template("sgconfig.yml")),
         plan_new_file(checks / "rules" / ".gitkeep", ""),
         plan_new_file(checks / "rule-tests" / ".gitkeep", ""),
@@ -174,7 +180,7 @@ def plan_makefile(root: Path) -> PlannedFile:
 
 
 def find_existing_layout(root: Path) -> Path | None:
-    candidates = (root / CONFIG_FILE_NAME, root / "lint-rules" / "sgconfig.yml")
+    candidates = (root / CONFIG_FILE_NAME, root / DEFAULT_CHECKS_DIR / "sgconfig.yml")
     return next((path for path in candidates if path.is_file()), None)
 
 
@@ -187,7 +193,7 @@ def build_plan(root: Path, arguments: argparse.Namespace) -> list[PlannedFile]:
             existing.relative_to(root),
         )
     else:
-        plan.extend(plan_layout(root, arguments.checks_dir))
+        plan.extend(plan_layout(root, choose_checks_dir(arguments)))
     version = read_rulepack_version()
     if arguments.pre_commit:
         plan.append(plan_pre_commit(root, version))
@@ -203,10 +209,26 @@ def show_plan(plan: list[PlannedFile], root: Path) -> None:
         logger.info("  %-16s %s", planned.action, planned.path.relative_to(root))
 
 
-def ask_confirmation() -> bool:
-    sys.stderr.write("Write these files? [y/N] ")
+def ask_yes_no(question: str) -> bool:
+    sys.stderr.write(f"{question} [y/N] ")
     sys.stderr.flush()
     return sys.stdin.readline().strip().lower() in {"y", "yes"}
+
+
+def choose_checks_dir(arguments: argparse.Namespace) -> str | None:
+    """--checks-dir, or the person's answer when nobody passed it.
+
+    Only a person at a terminal is asked; --yes, --dry-run, scripts and agents get
+    the default, a repo that keeps its checks elsewhere.
+    """
+    checks_dir: str | None = arguments.checks_dir
+    can_ask = sys.stdin.isatty() and not arguments.yes and not arguments.dry_run
+    if checks_dir is not None or not can_ask:
+        return checks_dir
+    keeps_own_checks = ask_yes_no(
+        f"Keep this repo's own checks in {DEFAULT_CHECKS_DIR}/?"
+    )
+    return DEFAULT_CHECKS_DIR if keeps_own_checks else None
 
 
 def write_plan(plan: list[PlannedFile]) -> None:
@@ -228,13 +250,18 @@ def parse_arguments(argv: list[str] | None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         prog="rulepack init",
         description=(
-            "Scaffold the rules-as-checks layout: .rulepack.toml and an ast-grep "
-            "sgconfig with empty rules/ and rule-tests/. Shows the plan and waits "
-            "for confirmation; never overwrites a file."
+            "Scaffold the rules-as-checks layout: .rulepack.toml, and with "
+            "--checks-dir an ast-grep sgconfig with empty rules/ and rule-tests/. "
+            "Shows the plan and waits for confirmation; never overwrites a file."
         ),
     )
     parser.add_argument(
-        "--checks-dir", type=parse_relative_folder, default="lint-rules"
+        "--checks-dir",
+        type=parse_relative_folder,
+        help=(
+            "Keep this repo's own checks in this folder (for example lint). "
+            "Without it, the repo only consumes checks kept elsewhere."
+        ),
     )
     parser.add_argument(
         "--pre-commit",
@@ -284,7 +311,7 @@ def main(argv: list[str] | None = None) -> int:
     if arguments.dry_run:
         logger.info("init: dry run, nothing written")
         return 0
-    if not arguments.yes and not ask_confirmation():
+    if not arguments.yes and not ask_yes_no("Write these files?"):
         logger.info("init: nothing written")
         return 1
     write_plan(plan)
