@@ -62,13 +62,18 @@ def plan_new_file(path: Path, content: str) -> PlannedFile:
     return PlannedFile(path=path, action="create", content=content)
 
 
-def plan_layout(root: Path, checks_dir: str) -> list[PlannedFile]:
+def plan_layout(root: Path, checks_dir: str | None) -> list[PlannedFile]:
+    """The config, plus a local checks folder when the repo keeps its own checks."""
+    local_checks = f'sgconfig = "{checks_dir}/sgconfig.yml"\n\n' if checks_dir else ""
+    config = plan_new_file(
+        root / CONFIG_FILE_NAME,
+        render_template("rulepack.toml", local_checks=local_checks),
+    )
+    if checks_dir is None:
+        return [config]
     checks = root / checks_dir
     return [
-        plan_new_file(
-            root / CONFIG_FILE_NAME,
-            render_template("rulepack.toml", checks_dir=checks_dir),
-        ),
+        config,
         plan_new_file(checks / "sgconfig.yml", render_template("sgconfig.yml")),
         plan_new_file(checks / "rules" / ".gitkeep", ""),
         plan_new_file(checks / "rule-tests" / ".gitkeep", ""),
@@ -228,12 +233,19 @@ def parse_arguments(argv: list[str] | None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         prog="rulepack init",
         description=(
-            "Scaffold the rules-as-checks layout: .rulepack.toml and an ast-grep "
-            "sgconfig with empty rules/ and rule-tests/. Shows the plan and waits "
-            "for confirmation; never overwrites a file."
+            "Scaffold the rules-as-checks layout: .rulepack.toml, and with "
+            "--checks-dir an ast-grep sgconfig with empty rules/ and rule-tests/. "
+            "Shows the plan and waits for confirmation; never overwrites a file."
         ),
     )
-    parser.add_argument("--checks-dir", type=parse_relative_folder, default="lint")
+    parser.add_argument(
+        "--checks-dir",
+        type=parse_relative_folder,
+        help=(
+            "Keep this repo's own checks in this folder (for example lint). "
+            "Without it, the repo only consumes checks kept elsewhere."
+        ),
+    )
     parser.add_argument(
         "--pre-commit",
         action="store_true",

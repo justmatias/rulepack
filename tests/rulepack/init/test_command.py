@@ -14,10 +14,20 @@ USER_PRE_COMMIT = (
 )
 
 
-def test_init_creates_a_layout_that_passes_lint_when_repo_is_empty(
+def test_init_writes_only_a_config_that_passes_lint_when_checks_dir_is_not_given(
     run_init, git_repository
 ):
     completed = run_init("--yes")
+
+    assert completed.returncode == 0, completed.stderr
+    assert list(read_tree(git_repository)) == [".rulepack.toml"]
+    assert "sgconfig" not in (git_repository / ".rulepack.toml").read_text()
+
+
+def test_init_creates_local_checks_that_pass_lint_when_checks_dir_is_given(
+    run_init, git_repository
+):
+    completed = run_init("--yes", "--checks-dir", "lint")
 
     assert completed.returncode == 0, completed.stderr
     assert sorted(read_tree(git_repository)) == [
@@ -119,7 +129,7 @@ def test_init_writes_the_plan_when_confirmed(run_init, git_repository):
 def test_init_leaves_layout_as_it_is_when_config_exists(run_init, git_repository):
     (git_repository / ".rulepack.toml").write_text('sgconfig = "checks/sg.yml"\n')
 
-    completed = run_init("--yes")
+    completed = run_init("--yes", "--checks-dir", "lint")
 
     assert (git_repository / ".rulepack.toml").read_text() == (
         'sgconfig = "checks/sg.yml"\n'
