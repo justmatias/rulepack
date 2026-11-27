@@ -93,13 +93,22 @@ def build_step_result(completed: subprocess.CompletedProcess) -> StepResult:
     return StepResult(ok=ok, findings=[] if ok else [*collect_output_lines(completed)])
 
 
-def require_sgconfig(run: LintRun) -> Path:
+def find_sgconfig(run: LintRun) -> Path | None:
+    """The repo's ast-grep config, or None when it keeps no checks of its own.
+
+    Only the default path may be missing: a repo that sets `sgconfig` expects it.
+    """
     path = run.config.values.sgconfig
-    if not path.is_file():
-        raise LintError(
-            f"no ast-grep config at {path} (set sgconfig in .rulepack.toml)"
-        )
-    return path
+    if path.is_file():
+        return path
+    if run.config.sources["sgconfig"] == "default":
+        return None
+    raise LintError(f"no ast-grep config at {path} (set sgconfig in .rulepack.toml)")
+
+
+def describe_missing_local_checks(run: LintRun) -> str:
+    relative = os.path.relpath(run.config.values.sgconfig, run.config.root)
+    return f"no local checks at {Path(relative).as_posix()}"
 
 
 def has_rule_tests(sgconfig: Path) -> bool:
@@ -117,7 +126,9 @@ def has_rule_tests(sgconfig: Path) -> bool:
 
 
 def run_test_step(run: LintRun) -> StepResult:
-    sgconfig = require_sgconfig(run)
+    sgconfig = find_sgconfig(run)
+    if sgconfig is None:
+        return StepResult(ok=True, skipped=describe_missing_local_checks(run))
     if not has_rule_tests(sgconfig):
         return StepResult(ok=True, skipped="the sgconfig has no rule tests")
     command = [find_tool("ast-grep"), "test", "-c", str(sgconfig)]
@@ -148,7 +159,9 @@ def build_scan_arguments(run: LintRun) -> list[str]:
 def run_scan_step(run: LintRun) -> StepResult:
     if run.mode != "full" and not run.files:
         return StepResult(ok=True, skipped="no changed files to scan")
-    sgconfig = require_sgconfig(run)
+    sgconfig = find_sgconfig(run)
+    if sgconfig is None:
+        return StepResult(ok=True, skipped=describe_missing_local_checks(run))
     command = [find_tool("ast-grep"), "scan", "-c", str(sgconfig)]
     if run.json_output:
         command.append("--json=stream")
