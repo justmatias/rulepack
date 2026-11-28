@@ -38,20 +38,8 @@ def test_pyproject_table_is_ignored_when_no_rulepack_toml(
     assert resolve_config(start=git_repository).file is None
 
 
-@pytest.mark.parametrize(
-    "content",
-    [
-        'rule_dir = "rules"\n',
-        '[scan]\nexcludes = ["generated/**"]\n',
-        'rules_dir = "rules"\n',
-    ],
-    ids=["top-level", "nested", "removed-key"],
-)
-def test_config_fails_when_key_is_unknown(
-    git_repository: Path, write_config, content: str
-):
-    write_config(content)
-
+@pytest.mark.usefixtures("_write_unknown_key_config")
+def test_config_fails_when_key_is_unknown(git_repository: Path):
     with pytest.raises(ConfigError, match="Extra inputs are not permitted"):
         resolve_config(start=git_repository)
 
