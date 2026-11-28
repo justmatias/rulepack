@@ -12,7 +12,7 @@ from rulepack.config import (
 )
 from rulepack.packs.lock import read_lock, write_lock
 from rulepack.packs.manifest import load_manifest
-from rulepack.packs.sources import lock_sources, resolve_source_root
+from rulepack.packs.sources import lock_sources, resolve_source
 
 logger = logging.getLogger(__name__)
 
@@ -30,17 +30,11 @@ def describe_sources(config: ResolvedConfig) -> dict[str, SourceDescription]:
     lock = read_lock(config.lock_file)
     described: dict[str, SourceDescription] = {}
     for name, source in sorted(config.values.sources.items()):
-        manifest = load_manifest(resolve_source_root(name, source, lock))
-        entry = lock.sources.get(name)
-        # A source that became a path keeps its old lock entry until relocked.
-        locked_commit = (
-            entry.commit
-            if entry is not None and isinstance(source, GitSource)
-            else None
-        )
+        resolved = resolve_source(name, source, lock)
+        manifest = load_manifest(resolved.root)
         described[name] = SourceDescription(
             **source.model_dump(mode="json"),
-            commit=locked_commit,
+            commit=resolved.commit,
             packs={
                 pack: list(manifest.packs[pack].checks)
                 for pack in sorted(manifest.packs)
@@ -108,7 +102,8 @@ def main(argv: list[str] | None = None) -> int:
         if arguments.command == "update"
         else set()
     )
-    lock = lock_sources(config, update)
+    selected_only = arguments.command == "update" and bool(arguments.sources)
+    lock = lock_sources(config, update, selected_only=selected_only)
     write_lock(config.lock_file, lock)
     logger.info("packs: locked %d source(s) in %s", len(lock.sources), config.lock_file)
     return 0

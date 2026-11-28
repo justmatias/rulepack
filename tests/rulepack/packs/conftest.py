@@ -1,8 +1,9 @@
-import subprocess
+import shutil
 from pathlib import Path
 
 import pytest
 
+from rulepack.packs.fetch import retry_after_making_writable
 from tests.rulepack.helpers import init_git_repository, run_git
 from tests.rulepack.packs.helpers import publish_source, write_source
 
@@ -41,18 +42,18 @@ def consumer(tmp_path: Path, source_url: str) -> Path:
 
 
 @pytest.fixture
-def run_in(run_rulepack):
-    def run(repository: Path, *arguments: str) -> subprocess.CompletedProcess:
-        return run_rulepack(*arguments, working_directory=repository)
-
-    return run
+def locked_consumer(consumer: Path, run_rulepack) -> Path:
+    completed = run_rulepack("packs", "lock", working_directory=consumer)
+    assert completed.returncode == 0, completed.stderr
+    return consumer
 
 
 @pytest.fixture
-def locked_consumer(consumer: Path, run_in) -> Path:
-    completed = run_in(consumer, "packs", "lock")
-    assert completed.returncode == 0, completed.stderr
-    return consumer
+def _remove_cached_source(
+    lock_text: str,  # pylint: disable=unused-argument  # lock populates the cache first
+    cache_directory: Path,
+) -> None:
+    shutil.rmtree(cache_directory, onexc=retry_after_making_writable)
 
 
 @pytest.fixture

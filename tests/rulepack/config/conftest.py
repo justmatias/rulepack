@@ -24,3 +24,8 @@ def invalid_source(request: pytest.FixtureRequest) -> str:
 @pytest.fixture
 def _change_to_git_repository(git_repository: Path, monkeypatch) -> None:
     monkeypatch.chdir(git_repository)
+
+
+@pytest.fixture
+def _write_path_source_config(write_config) -> None:
+    write_config('[sources.team]\npath = "packs/team"\n')

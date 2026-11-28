@@ -36,10 +36,10 @@ def test_command_exits_with_message_when_config_is_invalid(
     assert ".rulepack.toml" in completed.stderr
 
 
+@pytest.mark.usefixtures("_write_path_source_config")
 def test_config_command_shows_a_path_source_relative_to_the_repo_when_inside_it(
-    run_rulepack, write_config, git_repository
+    run_rulepack, git_repository
 ):
-    write_config('[sources.team]\npath = "packs/team"\n')
 
     completed = run_rulepack("config", "--json", working_directory=git_repository)
 

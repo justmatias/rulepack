@@ -13,7 +13,7 @@ LOCK_HEADER = "# Written by `rulepack packs lock`. Commit this file.\n\n"
 class LockEntry(StrictModel):
     git: str
     ref: str
-    commit: str
+    commit: str = Field(pattern=r"^(?:[0-9a-f]{40}|[0-9a-f]{64})$")
 
     def matches(self, source: GitSource) -> bool:
         """Whether this pin was made for the source's current git URL and ref."""
@@ -45,13 +45,19 @@ def write_lock(path: Path, lock: Lock) -> None:
         return
     # newline="\n": the same bytes on every OS, so a lock written on Windows
     # does not churn against one written elsewhere.
-    with tempfile.NamedTemporaryFile(
-        "w",
-        dir=path.parent,
-        delete=False,
-        encoding="utf-8",
-        newline="\n",
-        suffix=".tmp",
-    ) as pending:
-        pending.write(text)
-    Path(pending.name).replace(path)
+    pending_path = None
+    try:
+        with tempfile.NamedTemporaryFile(
+            "w",
+            dir=path.parent,
+            delete=False,
+            encoding="utf-8",
+            newline="\n",
+            suffix=".tmp",
+        ) as pending:
+            pending_path = Path(pending.name)
+            pending.write(text)
+        pending_path.replace(path)
+    finally:
+        if pending_path is not None:
+            pending_path.unlink(missing_ok=True)

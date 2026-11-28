@@ -1,6 +1,12 @@
 from pathlib import Path
 
-from rulepack.config import ConfigError, GitSource, PackSource, ResolvedConfig
+from rulepack.config import (
+    ConfigError,
+    GitSource,
+    PackSource,
+    ResolvedConfig,
+    StrictModel,
+)
 from rulepack.packs.fetch import fetch_commit, resolve_ref
 from rulepack.packs.lock import Lock, LockEntry, read_lock
 
@@ -19,20 +25,34 @@ def find_locked_entry(name: str, source: GitSource, lock: Lock) -> LockEntry:
     return entry
 
 
-def resolve_source_root(name: str, source: PackSource, lock: Lock) -> Path:
-    """The source's folder: the path itself, or the locked commit in the cache."""
+class ResolvedSource(StrictModel):
+    root: Path
+    commit: str | None = None
+
+
+def resolve_source(name: str, source: PackSource, lock: Lock) -> ResolvedSource:
     if not isinstance(source, GitSource):
-        return source.path
+        return ResolvedSource(root=source.path)
     entry = find_locked_entry(name, source, lock)
-    return fetch_commit(entry.git, entry.commit)
+    return ResolvedSource(
+        root=fetch_commit(entry.git, entry.commit), commit=entry.commit
+    )
 
 
-def lock_sources(config: ResolvedConfig, update: set[str]) -> Lock:
+def resolve_source_root(name: str, source: PackSource, lock: Lock) -> Path:
+    return resolve_source(name, source, lock).root
+
+
+def lock_sources(
+    config: ResolvedConfig, update: set[str], *, selected_only: bool = False
+) -> Lock:
     """Pin every git source: keep unchanged pins, re-resolve the ones in `update`."""
     previous = read_lock(config.lock_file)
-    lock = Lock()
+    lock = Lock(sources=previous.sources.copy()) if selected_only else Lock()
     for name, source in sorted(config.values.sources.items()):
         if not isinstance(source, GitSource):
+            continue
+        if selected_only and name not in update:
             continue
         entry = previous.sources.get(name)
         if entry is None or not entry.matches(source) or name in update:

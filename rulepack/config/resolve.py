@@ -5,7 +5,7 @@ from typing import Any
 from pydantic import ValidationError
 
 from rulepack.config.project_paths import find_config_path, find_git_root
-from rulepack.config.settings import ProjectConfig, ResolvedConfig, Source
+from rulepack.config.settings import PathSource, ProjectConfig, ResolvedConfig, Source
 
 # Keys whose values are paths (or lists of paths) relative to the config file.
 PATH_KEYS = {
@@ -56,17 +56,6 @@ def absolute(value: Any, base: Path) -> Any:
     return path if path.is_absolute() else base / path
 
 
-def make_source_paths_absolute(
-    sources: dict[str, dict[str, Any]], base: Path
-) -> dict[str, dict[str, Any]]:
-    return {
-        name: {**entry, "path": absolute(entry["path"], base)}
-        if entry.get("path") is not None
-        else entry
-        for name, entry in sources.items()
-    }
-
-
 def validate(data: dict[str, Any], origin: str) -> ProjectConfig:
     try:
         return ProjectConfig.model_validate(data)
@@ -90,13 +79,13 @@ def resolve_config(
     file_data = read_toml(config_file) if config_file else {}
     root = config_file.parent if config_file else (git_root or start)
 
-    file_values = flatten(
-        validate(file_data, str(config_file)).model_dump(exclude_unset=True)
-    )
-    if "sources" in file_values:
-        file_values["sources"] = make_source_paths_absolute(
-            file_values["sources"], root
-        )
+    file_config = validate(file_data, str(config_file))
+    for name, source in file_config.sources.items():
+        if isinstance(source, PathSource):
+            file_config.sources[name] = source.model_copy(
+                update={"path": absolute(source.path, root)}
+            )
+    file_values = flatten(file_config.model_dump(exclude_unset=True))
     merged = flatten(ProjectConfig().model_dump())
     sources: dict[str, Source] = dict.fromkeys(merged, "default")
     merged.update(file_values)
