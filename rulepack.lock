@@ -1,0 +1,6 @@
+# Written by `rulepack packs lock`. Commit this file.
+
+[sources.mstack]
+git = "https://github.com/justmatias/mstack"
+ref = "v7.4.0"
+commit = "e05ee3b1e078cd9c428dd6ee2f492d4e5d64808a"

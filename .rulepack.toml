@@ -1,4 +1,9 @@
-# rulepack reads this file; the pinned mstack hooks still read .mstack.toml.
+# rulepack lints itself with mstack's Python checks, loaded as packs.
+packs = ["mstack/python-core", "mstack/testing"]
+
+[sources.mstack]
+git = "https://github.com/justmatias/mstack"
+ref = "v7.4.0"
 
 [scan]
 # A sample repo whose invalid/ folder breaks the checks on purpose.
