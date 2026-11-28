@@ -11,8 +11,6 @@ dist/
 
 # Tooling
 .import_linter_cache/
-.coverage
-htmlcov/
 
 # Local agent settings
 .claude/settings.local.json
