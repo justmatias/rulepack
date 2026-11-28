@@ -336,7 +336,11 @@ def parse_arguments(argv: list[str] | None) -> argparse.Namespace:
     parser.add_argument(
         "--yes", action="store_true", help="Write without asking for confirmation."
     )
-    return parser.parse_args(argv)
+    arguments = parser.parse_args(argv)
+    names = [source.name for source in arguments.source]
+    if duplicates := sorted({name for name in names if names.count(name) > 1}):
+        parser.error(f"--source names must be unique: {', '.join(duplicates)}")
+    return arguments
 
 
 def main(argv: list[str] | None = None) -> int:

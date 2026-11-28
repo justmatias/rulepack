@@ -40,3 +40,16 @@ def test_init_rejects_the_source_when_it_has_no_ref(
     assert completed.returncode == 2
     assert "must look like <name>=<git url>@<ref>" in completed.stderr
     assert not (fresh_repository / ".rulepack.toml").exists()
+
+
+def test_init_rejects_the_sources_when_two_share_a_name(
+    fresh_repository: Path, source_url: str, run_in
+):
+    completed = run_in(
+        fresh_repository, "init", "--yes",
+        "--source", f"team={source_url}@main", "--source", f"team={source_url}@v1",
+    )  # fmt: skip
+
+    assert completed.returncode == 2
+    assert "--source names must be unique: team" in completed.stderr
+    assert not (fresh_repository / ".rulepack.toml").exists()
