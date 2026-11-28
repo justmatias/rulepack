@@ -211,4 +211,6 @@ def test_lint_names_the_file_when_a_pack_rule_test_is_not_a_mapping(
     completed = run_in(path_consumer, "lint", "--only", "test")
 
     assert completed.returncode == 2
-    assert "every rule test must be a mapping" in completed.stderr
+    assert "no-bare-except-test.yml: every rule test must be a mapping" in (
+        completed.stderr
+    )
