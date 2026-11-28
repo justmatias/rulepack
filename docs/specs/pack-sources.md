@@ -1,7 +1,7 @@
 # Pack sources
 
 - **Phase:** next, after the migration
-- **Depends on:** [migrate-from-mstack](migrate-from-mstack.md), and mstack's [mstack-uses-rulepack](https://github.com/justmatias/mstack/blob/main/docs/specs/mstack-uses-rulepack.md). Both must have merged: this spec is written against rulepack's own config and code, and mstack must already contain only content.
+- **Depends on:** mstack's [mstack-uses-rulepack](https://github.com/justmatias/mstack/blob/main/docs/specs/mstack-uses-rulepack.md), which must have merged: mstack must already contain only content.
 
 ## Problem
 
