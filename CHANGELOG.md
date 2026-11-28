@@ -2,6 +2,42 @@
 
 <!-- version list -->
 
+## v0.7.0 (2026-11-28)
+
+### Features
+
+- **hooks**: Run checks while agents edit with rulepack hook
+  ([`ee7526c`](https://github.com/justmatias/rulepack/commit/ee7526c5e5c2eafc56fff5c6cd937c61db02ee53))
+
+### Refactoring
+
+- **hooks**: Check the hook config once before selecting files
+  ([`4542e36`](https://github.com/justmatias/rulepack/commit/4542e3612b7419c0c02f1d04ffe95cbc3b2bb97d))
+
+- **hooks**: Handle hook errors once in main
+  ([`85facef`](https://github.com/justmatias/rulepack/commit/85facef5dd706d380ce7280fd08f521c5c7b88ac))
+
+- **hooks**: Parse payload paths as Path fields
+  ([`963fe87`](https://github.com/justmatias/rulepack/commit/963fe87738731c434b514357d6442c4a9cc8e1a5))
+
+- **hooks**: Validate hook input and name functions by action
+  ([`10d3a41`](https://github.com/justmatias/rulepack/commit/10d3a41d24bd202da8cc28ac0971dfd488d9bcb6))
+
+### Testing
+
+- **hooks**: Apply the temp directory isolation with usefixtures
+  ([`0b86e7a`](https://github.com/justmatias/rulepack/commit/0b86e7a6c1acdb56db26b2bf7454f86419775f60))
+
+- **hooks**: Give each hook test one behavior and fixture-driven cases
+  ([`a4a223f`](https://github.com/justmatias/rulepack/commit/a4a223fe087ebfc957955c6ef14c8bd374b9b318))
+
+- **hooks**: Provide the bare-except source as a fixture
+  ([`bdcc48c`](https://github.com/justmatias/rulepack/commit/bdcc48c6d647d0bc14ac71b4a5666264e5457887))
+
+- **hooks**: Share config and unscanned-file setup in fixtures
+  ([`e67b1ee`](https://github.com/justmatias/rulepack/commit/e67b1eeede99d1995e31d09e7a8e094cf7f3e1e0))
+
+
 ## v0.6.0 (2026-11-27)
 
 ### Documentation

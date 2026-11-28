@@ -1,19 +1,9 @@
 import json
-import shutil
 from pathlib import Path
 
 import pytest
 
-from tests.rulepack.lint.helpers import init_git_repository, run_git
-
-
-@pytest.fixture
-def commit():
-    def run(repository: Path, message: str = "change") -> None:
-        run_git(repository, "add", "--all")
-        run_git(repository, "commit", "--quiet", "-m", message)
-
-    return run
+from tests.rulepack.helpers import init_git_repository, run_git
 
 
 @pytest.fixture
@@ -26,16 +16,6 @@ def feature_repository(tmp_path: Path) -> Path:
     init_git_repository(repository)
     run_git(repository, "checkout", "--quiet", "-b", "feature")
     return repository
-
-
-@pytest.fixture
-def lint_sandbox(sample_repository: Path, tmp_path: Path) -> Path:
-    """A committed git repo with the sample checks, fixtures and config."""
-    sandbox = tmp_path / "sandbox"
-    shutil.copytree(
-        sample_repository, sandbox, ignore=shutil.ignore_patterns("__pycache__")
-    )
-    return init_git_repository(sandbox)
 
 
 @pytest.fixture
