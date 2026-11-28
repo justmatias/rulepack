@@ -2,7 +2,7 @@ from pathlib import Path
 
 import pytest
 
-from rulepack.config import ConfigError, resolve_config
+from rulepack.config import ConfigError, PathSource, resolve_config
 
 
 def test_config_uses_defaults_when_file_is_missing(git_repository: Path):
@@ -95,7 +95,9 @@ def test_config_resolves_a_path_source_against_the_config_when_started_below_it(
 
     config = resolve_config(start=git_repository / "packs")
 
-    assert config.values.sources["team"].path == git_repository / "packs/team"
+    assert config.values.sources["team"] == PathSource(
+        path=git_repository / "packs/team"
+    )
     assert config.lock_file == git_repository / "rulepack.lock"
 
 

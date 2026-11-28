@@ -3,7 +3,13 @@ import json
 import logging
 import sys
 
-from rulepack.config import ConfigError, ResolvedConfig, StrictModel, resolve_config
+from rulepack.config import (
+    ConfigError,
+    GitSource,
+    ResolvedConfig,
+    StrictModel,
+    resolve_config,
+)
 from rulepack.packs.lock import read_lock, write_lock
 from rulepack.packs.manifest import load_manifest
 from rulepack.packs.sources import lock_sources, resolve_source_root
@@ -12,9 +18,9 @@ logger = logging.getLogger(__name__)
 
 
 class SourceDescription(StrictModel):
-    git: str | None
-    ref: str | None
-    path: str | None
+    git: str | None = None
+    ref: str | None = None
+    path: str | None = None
     commit: str | None
     # Each pack's check ids, by pack name.
     packs: dict[str, list[str]]
@@ -27,10 +33,11 @@ def describe_sources(config: ResolvedConfig) -> dict[str, SourceDescription]:
         manifest = load_manifest(resolve_source_root(name, source, lock))
         entry = lock.sources.get(name)
         described[name] = SourceDescription(
-            git=source.git,
-            ref=source.ref,
-            path=str(source.path) if source.path else None,
-            commit=entry.commit if entry and source.git else None,
+            **source.model_dump(mode="json"),
+            # A source that became a path keeps its old lock entry until relocked.
+            commit=entry.commit
+            if entry is not None and isinstance(source, GitSource)
+            else None,
             packs={
                 pack: list(manifest.packs[pack].checks)
                 for pack in sorted(manifest.packs)
@@ -53,7 +60,11 @@ def print_sources(described: dict[str, SourceDescription]) -> None:
 
 def select_sources_to_update(config: ResolvedConfig, names: list[str]) -> set[str]:
     """The named git sources, or every git source when none is named."""
-    git_sources = {name for name, source in config.values.sources.items() if source.git}
+    git_sources = {
+        name
+        for name, source in config.values.sources.items()
+        if isinstance(source, GitSource)
+    }
     selected = set(names) or git_sources
     if unknown := sorted(selected - git_sources):
         raise ConfigError(f"no git source named {', '.join(unknown)}")

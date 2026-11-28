@@ -1,7 +1,7 @@
 from pathlib import Path
-from typing import Literal
+from typing import Annotated, Any, Literal
 
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pydantic import BaseModel, ConfigDict, Discriminator, Field, Tag
 
 Source = Literal["default", "file", "flag"]
 
@@ -24,20 +24,30 @@ class HookSettings(StrictModel):
     timeout: float = Field(default=10.0, gt=0, allow_inf_nan=False)
 
 
-class PackSource(StrictModel):
-    """Where packs come from: a git repo at a ref, or a local folder."""
+class GitSource(StrictModel):
+    """Packs from a git repo at a branch, tag or commit."""
 
-    git: str | None = None
-    ref: str | None = None
-    path: Path | None = None
+    git: str
+    ref: str
 
-    @model_validator(mode="after")
-    def check_kind(self) -> "PackSource":
-        if (self.git is None) == (self.path is None):
-            raise ValueError("a source has exactly one of 'git' or 'path'")
-        if (self.git is None) != (self.ref is None):
-            raise ValueError("a git source needs a 'ref', and a path source has none")
-        return self
+
+class PathSource(StrictModel):
+    """Packs from a local folder."""
+
+    path: Path
+
+
+def classify_source(value: Any) -> str:
+    """A table with `path` is a path source; any other is a git source."""
+    if isinstance(value, dict):
+        return "path" if "path" in value else "git"
+    return "path" if isinstance(value, PathSource) else "git"
+
+
+PackSource = Annotated[
+    Annotated[GitSource, Tag("git")] | Annotated[PathSource, Tag("path")],
+    Discriminator(classify_source),
+]
 
 
 class ProjectConfig(StrictModel):

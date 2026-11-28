@@ -1,13 +1,13 @@
 from pathlib import Path
 
-from rulepack.config import ConfigError, PackSource, ResolvedConfig
+from rulepack.config import ConfigError, GitSource, PackSource, ResolvedConfig
 from rulepack.packs.fetch import fetch_commit, resolve_ref
 from rulepack.packs.lock import Lock, LockEntry, read_lock
 
 LOCK_COMMAND = "run `rulepack packs lock`"
 
 
-def find_locked_entry(name: str, source: PackSource, lock: Lock) -> LockEntry:
+def find_locked_entry(name: str, source: GitSource, lock: Lock) -> LockEntry:
     entry = lock.sources.get(name)
     if entry is None:
         raise ConfigError(f"source {name!r} is not in the lock; {LOCK_COMMAND}")
@@ -21,7 +21,7 @@ def find_locked_entry(name: str, source: PackSource, lock: Lock) -> LockEntry:
 
 def resolve_source_root(name: str, source: PackSource, lock: Lock) -> Path:
     """The source's folder: the path itself, or the locked commit in the cache."""
-    if source.path is not None:
+    if not isinstance(source, GitSource):
         return source.path
     entry = find_locked_entry(name, source, lock)
     return fetch_commit(entry.git, entry.commit)
@@ -32,7 +32,7 @@ def lock_sources(config: ResolvedConfig, update: set[str]) -> Lock:
     previous = read_lock(config.lock_file)
     lock = Lock()
     for name, source in sorted(config.values.sources.items()):
-        if source.git is None or source.ref is None:
+        if not isinstance(source, GitSource):
             continue
         entry = previous.sources.get(name)
         is_unchanged = entry is not None and (entry.git, entry.ref) == (

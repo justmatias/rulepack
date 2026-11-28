@@ -44,6 +44,6 @@ def test_config_command_shows_a_path_source_relative_to_the_repo_when_inside_it(
     completed = run_rulepack("config", "--json", working_directory=git_repository)
 
     assert json.loads(completed.stdout)["settings"]["sources"] == {
-        "value": {"team": {"git": None, "ref": None, "path": "packs/team"}},
+        "value": {"team": {"path": "packs/team"}},
         "source": "file",
     }
