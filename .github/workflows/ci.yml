@@ -59,6 +59,28 @@ jobs:
       - name: Tests
         run: make test
 
+  # Runs the reusable action (action.yml) on the sample repo, as another repo
+  # would, so a broken action fails here first.
+  action-self-test:
+    name: Action self-test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      # tests/fixtures/ is a repo of its own, so it is linted outside this checkout.
+      - name: Copy the sample repo out of the checkout
+        run: |
+          sample="$RUNNER_TEMP/sample"
+          cp -R tests/fixtures "$sample"
+          git -C "$sample" init --quiet
+          echo "SAMPLE_REPOSITORY=$sample" >> "$GITHUB_ENV"
+
+      - name: Run the rulepack lint action
+        uses: ./
+        with:
+          mode: full
+          working-directory: ${{ env.SAMPLE_REPOSITORY }}
+
   # The CLI must behave the same on every OS. `make` is a contributor
   # convenience (bash), so this job calls pytest and rulepack directly.
   portability:
@@ -107,7 +129,7 @@ jobs:
     name: Versioning
     runs-on: ubuntu-latest
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-    needs: [static-checks, portability, security]
+    needs: [static-checks, action-self-test, portability, security]
     # The release commit already arrived through the PR (release-prepare.yml).
     # This job only tags it and creates the GitHub release; tags are not
     # covered by the branch ruleset, so no push to main is needed.
