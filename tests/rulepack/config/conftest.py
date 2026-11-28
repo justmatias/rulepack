@@ -10,7 +10,19 @@ def _write_sgconfig_config(write_config) -> None:
 
 @pytest.fixture(
     params=[
-        'git = "https://example.invalid/team.git"\nref = "main"\npath = "team"\n',
+        'rule_dir = "rules"\n',
+        '[scan]\nexcludes = ["generated/**"]\n',
+        'rules_dir = "rules"\n',
+    ],
+    ids=["top-level", "nested", "removed-key"],
+)
+def unknown_key_config(request: pytest.FixtureRequest) -> str:
+    return request.param
+
+
+@pytest.fixture(
+    params=[
+        'git ="https://example.invalid/team.git"\nref = "main"\npath = "team"\n',
         "",
         'git = "https://example.invalid/team.git"\n',
         'path = "team"\nref = "main"\n',
