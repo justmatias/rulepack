@@ -166,3 +166,15 @@ def test_init_writes_only_config_when_terminal_user_keeps_checks_elsewhere(
 
     assert exit_code == 0
     assert list(read_tree(git_repository)) == [".rulepack.toml"]
+
+
+def test_init_exits_with_rename_message_when_mstack_toml_sets_lint_keys(
+    run_init, git_repository
+):
+    (git_repository / ".mstack.toml").write_text('sgconfig = "lint/sgconfig.yml"\n')
+
+    completed = run_init("--dry-run")
+
+    assert completed.returncode == 2
+    assert "rename the file to .rulepack.toml" in completed.stderr
+    assert not (git_repository / ".rulepack.toml").exists()

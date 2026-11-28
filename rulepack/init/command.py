@@ -9,7 +9,7 @@ from typing import Literal
 
 import yaml
 
-from rulepack.config import CONFIG_FILE_NAME, StrictModel
+from rulepack.config import CONFIG_FILE_NAME, StrictModel, reject_legacy_config
 from rulepack.config.project_paths import find_git_root
 from rulepack.lint.command import main as run_lint
 
@@ -193,6 +193,7 @@ def build_plan(root: Path, arguments: argparse.Namespace) -> list[PlannedFile]:
             existing.relative_to(root),
         )
     else:
+        reject_legacy_config(root, root)
         plan.extend(plan_layout(root, choose_checks_dir(arguments)))
     version = read_rulepack_version()
     if arguments.pre_commit:
