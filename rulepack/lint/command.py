@@ -1,4 +1,5 @@
 import argparse
+import contextlib
 import fnmatch
 import json
 import logging
@@ -7,15 +8,24 @@ import shutil
 import subprocess
 import sys
 import sysconfig
-from collections.abc import Callable
+import tempfile
+from collections.abc import Callable, Generator
 from pathlib import Path
 from typing import Literal
 
 import yaml
 from pydantic import Field
 
-from rulepack.config import ConfigError, ResolvedConfig, StrictModel, resolve_config
+from rulepack.config import (
+    ConfigError,
+    ResolvedConfig,
+    StrictModel,
+    is_ci,
+    resolve_config,
+)
 from rulepack.lint.changed_files import ChangedFilesError, list_changed_files
+from rulepack.lint.pack_checks import write_merged_sgconfig
+from rulepack.packs.sources import Pack, PacksNotCached, load_packs
 
 logger = logging.getLogger(__name__)
 
@@ -47,6 +57,9 @@ class LintRun(StrictModel):
     mode: Mode = "full"
     files: list[Path] = Field(default_factory=list)
     json_output: bool = False
+    packs: list[Pack] = Field(default_factory=list)
+    # The sgconfig that merges the repo's checks with the selected packs' checks.
+    merged_sgconfig: Path | None = None
 
 
 def find_tool(name: str) -> str:
@@ -97,7 +110,10 @@ def find_sgconfig(run: LintRun) -> Path | None:
     """The repo's ast-grep config, or None when it keeps no checks of its own.
 
     Only the default path may be missing: a repo that sets `sgconfig` expects it.
+    A run with packs uses the sgconfig that merges them with the repo's checks.
     """
+    if run.merged_sgconfig is not None:
+        return run.merged_sgconfig
     path = run.config.values.sgconfig
     if path.is_file():
         return path
@@ -147,12 +163,24 @@ def parse_scan_finding(line: str) -> ScanFinding:
 
 
 def build_scan_arguments(run: LintRun) -> list[str]:
+    # ast-grep finds the project from its config file: outside a git repo, the
+    # merged sgconfig in a temporary folder needs the targets spelled out in full.
+    needs_absolute_targets = (
+        run.merged_sgconfig is not None and run.config.git_root is None
+    )
     if run.mode == "full":
         excludes = [f"!{pattern}" for pattern in run.config.values.scan.exclude]
-        return [argument for glob in excludes for argument in ("--globs", glob)] + ["."]
+        target = str(run.config.root) if needs_absolute_targets else "."
+        globs = [argument for glob in excludes for argument in ("--globs", glob)]
+        return [*globs, target]
     return [
         "--error",
-        *[os.path.relpath(path, run.config.root) for path in run.files],
+        *[
+            str(path)
+            if needs_absolute_targets
+            else os.path.relpath(path, run.config.root)
+            for path in run.files
+        ],
     ]
 
 
@@ -261,8 +289,56 @@ def select_files(config: ResolvedConfig, paths: list[Path]) -> list[Path]:
     )
 
 
+def load_selected_packs(config: ResolvedConfig, offline: bool) -> list[Pack]:
+    """The selected packs; none when --offline finds a source uncached."""
+    if not offline:
+        return load_packs(config)
+    try:
+        return load_packs(config, fetch=False)
+    except PacksNotCached as error:
+        logger.warning("lint: pack checks skipped for this run: %s", error)
+        return []
+
+
+def warn_about_outside_paths(config: ResolvedConfig) -> None:
+    """In CI, a path source outside the repo is checked on this runner only."""
+    selected = {name.partition("/")[0] for name in config.values.packs}
+    for name in sorted(selected):
+        path = config.values.sources[name].path
+        is_inside_repository = config.git_root is not None and (
+            path is not None and path.resolve().is_relative_to(config.git_root)
+        )
+        if path is not None and not is_inside_repository:
+            logger.warning(
+                "lint: source %s is a path outside the repo (%s); CI may not have it",
+                name,
+                path,
+            )
+
+
 def build_run(arguments: argparse.Namespace) -> LintRun:
     config = resolve_config()
+    run = build_scoped_run(config, arguments)
+    if run.mode == "changed" and is_ci():
+        warn_about_outside_paths(config)
+    packs = load_selected_packs(config, arguments.offline)
+    return run.model_copy(update={"packs": packs})
+
+
+@contextlib.contextmanager
+def merge_pack_checks(run: LintRun, steps: list[str]) -> Generator[LintRun]:
+    """The run with a temporary sgconfig that adds the packs' checks and tests."""
+    if not run.packs or not {"scan", "test"}.intersection(steps):
+        yield run
+        return
+    with tempfile.TemporaryDirectory(prefix="rulepack-packs-") as directory:
+        merged = write_merged_sgconfig(
+            Path(directory), run.config, run.packs, find_sgconfig(run)
+        )
+        yield run.model_copy(update={"merged_sgconfig": merged})
+
+
+def build_scoped_run(config: ResolvedConfig, arguments: argparse.Namespace) -> LintRun:
     if arguments.files is not None:
         return LintRun(
             config=config,
@@ -344,6 +420,14 @@ def parse_arguments(argv: list[str] | None) -> argparse.Namespace:
         action="store_true",
         help="Print {step: {ok, skipped, findings}} as JSON.",
     )
+    parser.add_argument(
+        "--offline",
+        action="store_true",
+        help=(
+            "Never fetch a pack source: skip the pack checks when a locked commit "
+            "is not cached (the agent hooks run this)."
+        ),
+    )
     arguments = parser.parse_args(argv)
     if (arguments.base_ref or arguments.staged) and not arguments.changed:
         parser.error("--base-ref and --staged need --changed")
@@ -355,7 +439,8 @@ def main(argv: list[str] | None = None) -> int:
     try:
         run = build_run(arguments)
         steps = select_steps(arguments.only, arguments.skip)
-        results = {name: run_step(name, run) for name in steps}
+        with merge_pack_checks(run, steps) as merged_run:
+            results = {name: run_step(name, merged_run) for name in steps}
     except (LintError, ConfigError, ChangedFilesError, yaml.YAMLError) as error:
         logger.error("rulepack lint: %s", error)
         return 2

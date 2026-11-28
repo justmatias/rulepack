@@ -35,6 +35,13 @@ class Manifest(StrictModel):
     packs: dict[str, ManifestPack] = Field(default_factory=dict)
 
 
+class Pack(StrictModel):
+    source: str
+    name: str
+    checks: list[Path]
+    tests: list[Path]
+
+
 class LockEntry(StrictModel):
     git: str
     ref: str
@@ -73,6 +80,25 @@ def load_manifest(root: Path) -> Manifest:
     return manifest.model_copy(
         update={"checks_dir": checks_dir, "tests_dir": tests_dir}
     )
+
+
+def build_pack(source: str, name: str, manifest: Manifest) -> Pack:
+    if name not in manifest.packs:
+        raise ConfigError(f"source {source!r} has no pack {name!r}")
+    checks = [
+        manifest.checks_dir / f"{check}.yml" for check in manifest.packs[name].checks
+    ]
+    for path in checks:
+        if not path.is_file():
+            raise ConfigError(f"pack '{source}/{name}' is missing {path}")
+    tests = [
+        resolve_inside(
+            manifest.tests_dir, Path(f"{check}-test.yml"), f"test of {check!r}"
+        )
+        for check in manifest.packs[name].checks
+        if (manifest.tests_dir / f"{check}-test.yml").is_file()
+    ]
+    return Pack(source=source, name=name, checks=checks, tests=tests)
 
 
 def read_lock(path: Path) -> Lock:
@@ -241,3 +267,29 @@ def lock_sources(config: ResolvedConfig, update: set[str] | None = None) -> Lock
         fetch_commit(entry.git, entry.commit)
         lock.sources[name] = entry
     return lock
+
+
+def group_selected_packs(config: ResolvedConfig) -> dict[str, list[str]]:
+    """`<source>/<pack>` names grouped by source, in config order."""
+    by_source: dict[str, list[str]] = {}
+    for selected in dict.fromkeys(config.values.packs):
+        source, separator, name = selected.partition("/")
+        if not separator or not name or "/" in name:
+            raise ConfigError(f"pack {selected!r}: select packs as '<source>/<pack>'")
+        if source not in config.values.sources:
+            raise ConfigError(f"pack {selected!r}: no source named {source!r}")
+        by_source.setdefault(source, []).append(name)
+    return by_source
+
+
+def load_packs(config: ResolvedConfig, *, fetch: bool = True) -> list[Pack]:
+    by_source = group_selected_packs(config)
+    if not by_source:
+        return []
+    lock = read_lock(config.lock_file)
+    packs: list[Pack] = []
+    for source, names in by_source.items():
+        root = find_source_root(source, config.values.sources[source], lock, fetch)
+        manifest = load_manifest(root)
+        packs.extend(build_pack(source, name, manifest) for name in names)
+    return packs

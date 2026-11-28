@@ -6,7 +6,6 @@ from tests.rulepack.helpers import init_git_repository, run_git
 SAMPLE_REPOSITORY = Path(__file__).resolve().parents[2] / "fixtures"
 CHECKS = SAMPLE_REPOSITORY / "lint" / "rules"
 TESTS = SAMPLE_REPOSITORY / "lint" / "rule-tests"
-BARE_EXCEPT = SAMPLE_REPOSITORY / "invalid" / "error-handling" / "bare_except.py"
 
 
 def write_source(root: Path, packs: dict[str, list[str]], manifest: str = "") -> None:
@@ -49,3 +48,14 @@ def write_consumer_config(repository: Path, content: str) -> None:
 
 def read_head_commit(repository: Path) -> str:
     return run_git(repository, "rev-parse", "HEAD").strip()
+
+
+def write_local_check(repository: Path, check_id: str, pattern: str) -> None:
+    """A repo-owned ast-grep check at the default sgconfig path (lint/)."""
+    checks = repository / "lint"
+    (checks / "rules").mkdir(parents=True, exist_ok=True)
+    (checks / "sgconfig.yml").write_text("ruleDirs: [rules]\n")
+    (checks / "rules" / f"{check_id}.yml").write_text(
+        f"id: {check_id}\nlanguage: Python\nseverity: error\n"
+        f"message: Local check\nrule: {{pattern: {pattern}}}\n"
+    )

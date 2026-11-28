@@ -12,9 +12,14 @@ from pathlib import Path
 from pydantic import TypeAdapter
 
 from rulepack.config import ConfigError, ResolvedConfig, resolve_config
-from rulepack.config.project_paths import find_config_path, find_git_root
+from rulepack.config.project_paths import (
+    find_config_path,
+    find_git_root,
+    find_host_config_path,
+)
 from rulepack.hook.payload import HookPayload
 from rulepack.lint.command import ScanFinding, StepResult, select_files
+from rulepack.packs.sources import PacksNotCached, load_packs
 
 logger = logging.getLogger(__name__)
 
@@ -61,21 +66,34 @@ def list_findings(results: dict[str, StepResult]) -> list[str]:
 
 
 def resolve_hook_config(start: Path) -> ResolvedConfig | None:
-    """The project's config, when it has a config file that leaves hooks enabled."""
+    """The project's config, when it (or the host) selects checks and hooks are on."""
     config = resolve_config(start=start)
-    hooks_enabled = config.file is not None and config.values.hooks.enabled
+    is_configured = config.file is not None or bool(config.values.packs)
+    hooks_enabled = is_configured and config.values.hooks.enabled
     return config if hooks_enabled else None
+
+
+def warn_when_packs_are_not_cached(config: ResolvedConfig) -> None:
+    """The offline lint skips uncached packs; say so, since its stderr is not shown."""
+    try:
+        load_packs(config, fetch=False)
+    except PacksNotCached as error:
+        logger.warning("rulepack hook: pack checks skipped: %s", error)
 
 
 def lint_within_budget(
     config: ResolvedConfig, arguments: list[str], started: float
 ) -> list[str]:
-    """Lint with what is left of the hook's time budget, which starts at `started`."""
+    """Lint with what is left of the hook's time budget, which starts at `started`.
+
+    The hook never fetches a pack source mid-edit: lint runs offline.
+    """
+    warn_when_packs_are_not_cached(config)
     budget = config.values.hooks.timeout
     remaining = budget - (time.monotonic() - started)
     if remaining <= 0:
         raise subprocess.TimeoutExpired("rulepack lint", budget)
-    return list_findings(run_lint(config.root, arguments, remaining))
+    return list_findings(run_lint(config.root, ["--offline", *arguments], remaining))
 
 
 def find_edited_file_findings(
@@ -119,10 +137,17 @@ def find_new_stop_findings(directory: Path, session: str, started: float) -> lis
     return findings
 
 
+def find_project_root(start: Path, git_root: Path | None) -> Path | None:
+    """The nearest config's folder, or the git root when only host defaults apply."""
+    if config := find_config_path(start, git_root):
+        return config.parent
+    return git_root if git_root and find_host_config_path().is_file() else None
+
+
 def group_paths_by_project(
     directory: Path, paths: list[Path]
 ) -> dict[Path, list[Path]]:
-    """The edited paths inside the workspace, keyed by the project config's folder."""
+    """The edited paths inside the workspace, keyed by their project's root."""
     workspace = find_git_root(directory) or directory
     projects: dict[Path, list[Path]] = {}
     for path in paths:
@@ -130,9 +155,9 @@ def group_paths_by_project(
             continue
         git_root = find_git_root(path.parent)
         start = path.parent if git_root else directory
-        config = find_config_path(start, git_root)
-        if config and path.is_relative_to(config.parent):
-            projects.setdefault(config.parent, []).append(path)
+        root = find_project_root(start, git_root)
+        if root and path.is_relative_to(root):
+            projects.setdefault(root, []).append(path)
     return projects
 
 

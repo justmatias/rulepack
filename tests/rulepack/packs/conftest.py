@@ -1,3 +1,4 @@
+import json
 import subprocess
 from pathlib import Path
 
@@ -5,7 +6,6 @@ import pytest
 
 from tests.rulepack.helpers import init_git_repository
 from tests.rulepack.packs.helpers import (
-    BARE_EXCEPT,
     publish_source,
     write_consumer_config,
     write_source,
@@ -32,11 +32,11 @@ def source_url(tmp_path: Path, source_work: Path) -> str:
 
 
 @pytest.fixture
-def consumer(tmp_path: Path, source_url: str) -> Path:
+def consumer(tmp_path: Path, source_url: str, bare_except_source: str) -> Path:
     """A repo with a bare except, selecting team/python-core from a git source."""
     repository = tmp_path / "consumer"
     repository.mkdir()
-    (repository / "target.py").write_bytes(BARE_EXCEPT.read_bytes())
+    (repository / "target.py").write_text(bare_except_source, encoding="utf-8")
     write_consumer_config(
         repository,
         'packs = ["team/python-core"]\n\n'
@@ -58,3 +58,17 @@ def locked_consumer(consumer: Path, run_in) -> Path:
     completed = run_in(consumer, "packs", "lock")
     assert completed.returncode == 0, completed.stderr
     return consumer
+
+
+@pytest.fixture
+def cache_directory(tmp_path: Path) -> Path:
+    return tmp_path / "cache" / "rulepack" / "sources"
+
+
+@pytest.fixture
+def scan(run_in):
+    def run(repository: Path, *arguments: str) -> tuple[int, dict]:
+        completed = run_in(repository, "lint", "--only", "scan", "--json", *arguments)
+        return completed.returncode, json.loads(completed.stdout or "{}")
+
+    return run
