@@ -1,3 +1,4 @@
+import json
 import shutil
 from pathlib import Path
 
@@ -5,7 +6,7 @@ import pytest
 
 from rulepack.packs.fetch import retry_after_making_writable
 from tests.rulepack.helpers import init_git_repository, run_git
-from tests.rulepack.packs.helpers import publish_source, write_source
+from tests.rulepack.packs.helpers import BARE_EXCEPT, publish_source, write_source
 
 
 @pytest.fixture(autouse=True)
@@ -32,11 +33,14 @@ def source_url(tmp_path: Path, source_work: Path) -> str:
 
 @pytest.fixture
 def consumer(tmp_path: Path, source_url: str) -> Path:
-    """A git repo whose config declares the `team` git source at main."""
+    """A git repo with a bare except, selecting team/python-core from a git source."""
     repository = tmp_path / "consumer"
     repository.mkdir()
+    (repository / "target.py").write_bytes(BARE_EXCEPT.read_bytes())
     (repository / ".rulepack.toml").write_text(
-        f'[sources.team]\ngit = "{source_url}"\nref = "main"\n', encoding="utf-8"
+        'packs = ["team/python-core"]\n\n'
+        f'[sources.team]\ngit = "{source_url}"\nref = "main"\n',
+        encoding="utf-8",
     )
     return init_git_repository(repository)
 
@@ -73,11 +77,14 @@ def _push_new_source_commit(
 
 @pytest.fixture
 def path_consumer(tmp_path: Path, source_work: Path) -> Path:
-    """A folder whose config declares the source folder as the `team` path source."""
+    """A folder, not a git repo, selecting team/python-core from a path source."""
     repository = tmp_path / "local"
     repository.mkdir()
+    (repository / "target.py").write_bytes(BARE_EXCEPT.read_bytes())
     (repository / ".rulepack.toml").write_text(
-        f'[sources.team]\npath = "{source_work.as_posix()}"\n', encoding="utf-8"
+        'packs = ["team/python-core"]\n\n'
+        f'[sources.team]\npath = "{source_work.as_posix()}"\n',
+        encoding="utf-8",
     )
     return repository
 
@@ -98,3 +105,34 @@ def _rewrite_source_history(
     run_git(source_work, "push", "--quiet", "--force", "origin", "rewritten:main")
     # Otherwise a clone gets the old pack whole, unreachable commit included.
     run_git(tmp_path / "source.git", "config", "pack.allowPackReuse", "false")
+
+
+@pytest.fixture
+def scan(run_in):
+    def run(repository: Path, *arguments: str) -> tuple[int, dict]:
+        completed = run_in(repository, "lint", "--only", "scan", "--json", *arguments)
+        return completed.returncode, json.loads(completed.stdout or "{}")
+
+    return run
+
+
+@pytest.fixture
+def append_config(locked_consumer: Path):
+    def append(text: str) -> None:
+        config = locked_consumer / ".rulepack.toml"
+        config.write_text(config.read_text(encoding="utf-8") + text, encoding="utf-8")
+
+    return append
+
+
+@pytest.fixture
+def _write_local_check_with_pack_id(locked_consumer: Path) -> None:
+    """The repo's own no-bare-except, which never matches."""
+    checks = locked_consumer / "lint"
+    (checks / "rules").mkdir(parents=True)
+    (checks / "sgconfig.yml").write_text("ruleDirs: [rules]\n", encoding="utf-8")
+    (checks / "rules" / "local.yml").write_text(
+        "id: no-bare-except\nlanguage: Python\nseverity: error\n"
+        "message: Local rule\nrule: {pattern: never_called()}\n",
+        encoding="utf-8",
+    )

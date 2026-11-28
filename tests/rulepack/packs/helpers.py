@@ -3,7 +3,9 @@ from pathlib import Path
 
 from tests.rulepack.helpers import init_git_repository, run_git
 
-SAMPLE_CHECKS = Path(__file__).resolve().parents[2] / "fixtures" / "lint"
+SAMPLE_REPOSITORY = Path(__file__).resolve().parents[2] / "fixtures"
+SAMPLE_CHECKS = SAMPLE_REPOSITORY / "lint"
+BARE_EXCEPT = SAMPLE_REPOSITORY / "invalid" / "error-handling" / "bare_except.py"
 
 
 def write_source(root: Path, packs: dict[str, list[str]], manifest: str = "") -> None:
