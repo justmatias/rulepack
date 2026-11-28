@@ -27,13 +27,13 @@ uvx rulepack --version
 Until the first PyPI release is available, install from the GitHub release tag:
 
 ```bash
-uv tool install git+https://github.com/justmatias/rulepack@v0.8.0
+uv tool install git+https://github.com/justmatias/rulepack@v0.9.0
 ```
 
 Or run it without installing:
 
 ```bash
-uvx --from git+https://github.com/justmatias/rulepack@v0.8.0 rulepack --version
+uvx --from git+https://github.com/justmatias/rulepack@v0.9.0 rulepack --version
 ```
 
 ## Usage
@@ -112,7 +112,7 @@ steps:
   - uses: actions/checkout@v7
     with:
       fetch-depth: 0
-  - uses: justmatias/rulepack@v0.8.0
+  - uses: justmatias/rulepack@v0.9.0
 ```
 
 Inputs: `mode` (`full`, `changed` or `both`), `base-ref`, `rulepack-version`, `python-version` and `working-directory`. Every release moves the `v<major>` tag. On other CI providers, run `uvx --from git+https://github.com/justmatias/rulepack@<tag> rulepack lint`, and on merge requests the same with `--changed --base-ref origin/<base branch>`.
