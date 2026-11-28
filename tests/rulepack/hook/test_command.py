@@ -3,6 +3,9 @@ import pytest
 from tests.rulepack.helpers import run_git
 from tests.rulepack.hook.helpers import BARE_EXCEPT
 
+# The hook keeps its stop marker in the temp directory, so every test isolates it.
+pytestmark = pytest.mark.usefixtures("_isolate_temp_directory")
+
 QUIET = (0, "", "")
 
 

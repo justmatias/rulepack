@@ -14,12 +14,8 @@ def _isolate_temp_directory(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> 
         monkeypatch.setenv(name, str(tmp_path))
 
 
-# The hook keeps its stop marker in the temp directory, so isolate that first.
 @pytest.fixture
-def run_hook(
-    _isolate_temp_directory: None,  # pylint: disable=unused-argument
-    tmp_path: Path,
-):
+def run_hook(tmp_path: Path):
     def run(repository: Path, event: str, **payload: object):
         return subprocess.run(
             [sys.executable, "-m", "rulepack", "hook", event],
