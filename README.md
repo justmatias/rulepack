@@ -2,7 +2,7 @@
 
 Run ast-grep and import-linter checks from shared, versioned rule packs in any repo.
 
-**Status: under construction.** The CLI only answers `--version` and `--help` for now. The linter moves here from [mstack](https://github.com/justmatias/mstack), as planned in [mstack's specs](https://github.com/justmatias/mstack/tree/main/docs/specs).
+**Status: under construction.** `rulepack lint`, `init`, `config` and `hook` run the checks a repo keeps for itself; loading shared packs from other sources is still in progress. The linter moves here from [mstack](https://github.com/justmatias/mstack), as planned in [mstack's specs](https://github.com/justmatias/mstack/tree/main/docs/specs).
 
 ## Why
 
