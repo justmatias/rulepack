@@ -5,8 +5,6 @@ from pathlib import Path
 
 import pytest
 
-from tests.rulepack.hook.helpers import BARE_EXCEPT
-
 
 @pytest.fixture
 def _isolate_temp_directory(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -30,17 +28,24 @@ def run_hook(tmp_path: Path):
 
 
 @pytest.fixture
-def violating_target(lint_sandbox: Path) -> Path:
+def bare_except_source() -> str:
+    return "try:\n    value = 1\nexcept:\n    raise\n"
+
+
+@pytest.fixture
+def violating_target(lint_sandbox: Path, bare_except_source: str) -> Path:
     target = lint_sandbox / "target.py"
-    target.write_text(BARE_EXCEPT, encoding="utf-8")
+    target.write_text(bare_except_source, encoding="utf-8")
     return target
 
 
 @pytest.fixture(params=["invalid/target.py", "target.txt"])
-def unscanned_target(lint_sandbox: Path, request: pytest.FixtureRequest) -> Path:
+def unscanned_target(
+    lint_sandbox: Path, bare_except_source: str, request: pytest.FixtureRequest
+) -> Path:
     """A violating file that the sample config excludes or does not scan."""
     target = lint_sandbox / request.param
-    target.write_text(BARE_EXCEPT, encoding="utf-8")
+    target.write_text(bare_except_source, encoding="utf-8")
     return target
 
 
