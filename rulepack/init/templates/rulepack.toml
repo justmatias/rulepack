@@ -1,4 +1,4 @@
 # rulepack's config (written by `rulepack init`). Every `rulepack` command reads
 # this file; run `rulepack config` to see the resolved values.
-{{local_checks}}[scan]
+{{local_checks}}{{sources}}[scan]
 exclude = []

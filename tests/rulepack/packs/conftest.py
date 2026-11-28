@@ -161,3 +161,10 @@ def _break_pack_rule_tests(source_work: Path) -> None:
 def _write_pack_rule_test_as_a_list(source_work: Path) -> None:
     test = source_work / "lint" / "rule-tests" / "no-bare-except-test.yml"
     test.write_text("- id: no-bare-except\n", encoding="utf-8")
+
+
+@pytest.fixture
+def fresh_repository(tmp_path: Path) -> Path:
+    repository = tmp_path / "fresh"
+    repository.mkdir()
+    return init_git_repository(repository)
