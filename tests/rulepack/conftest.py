@@ -1,4 +1,6 @@
+import json
 import shutil
+import subprocess
 import sys
 from pathlib import Path
 
@@ -57,3 +59,29 @@ def lint_sandbox(sample_repository: Path, tmp_path: Path) -> Path:
         sample_repository, sandbox, ignore=shutil.ignore_patterns("__pycache__")
     )
     return init_git_repository(sandbox)
+
+
+@pytest.fixture
+def _isolate_temp_directory(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    for name in ("TMPDIR", "TEMP", "TMP"):
+        monkeypatch.setenv(name, str(tmp_path))
+
+
+@pytest.fixture
+def run_hook(tmp_path: Path):
+    def run(repository: Path, event: str, **payload: object):
+        return subprocess.run(
+            [sys.executable, "-m", "rulepack", "hook", event],
+            cwd=tmp_path,
+            input=json.dumps({"cwd": str(repository), **payload}),
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+
+    return run
+
+
+@pytest.fixture
+def bare_except_source() -> str:
+    return "try:\n    value = 1\nexcept:\n    raise\n"
