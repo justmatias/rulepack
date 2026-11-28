@@ -108,9 +108,11 @@ def _rewrite_source_history(
 
 
 @pytest.fixture
-def scan(run_in):
+def scan(run_rulepack):
     def run(repository: Path, *arguments: str) -> tuple[int, dict]:
-        completed = run_in(repository, "lint", "--only", "scan", "--json", *arguments)
+        completed = run_rulepack(
+            "lint", "--only", "scan", "--json", *arguments, working_directory=repository
+        )
         return completed.returncode, json.loads(completed.stdout or "{}")
 
     return run

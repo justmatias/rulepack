@@ -41,18 +41,24 @@ def test_lint_applies_the_severity_override_when_one_is_set(
 
 
 def test_lint_fails_when_an_override_names_an_unknown_check(
-    locked_consumer, append_config, run_in
+    locked_consumer, append_config, run_rulepack
 ):
     append_config('\n[pack_overrides]\ndisable = ["no-such-check"]\n')
 
-    completed = run_in(locked_consumer, "lint", "--only", "scan")
+    completed = run_rulepack(
+        "lint", "--only", "scan", working_directory=locked_consumer
+    )
 
     assert completed.returncode == 2
     assert "unknown checks: no-such-check" in completed.stderr
 
 
-def test_lint_runs_the_pack_rule_tests_when_a_pack_is_selected(locked_consumer, run_in):
-    completed = run_in(locked_consumer, "lint", "--only", "test", "--json")
+def test_lint_runs_the_pack_rule_tests_when_a_pack_is_selected(
+    locked_consumer, run_rulepack
+):
+    completed = run_rulepack(
+        "lint", "--only", "test", "--json", working_directory=locked_consumer
+    )
 
     assert completed.returncode == 0, completed.stderr
     assert json.loads(completed.stdout)["test"] == {
@@ -73,9 +79,9 @@ def test_lint_scans_with_a_path_source_when_the_folder_is_not_a_git_repo(
 
 
 def test_lint_fails_with_the_lock_message_when_the_lock_is_missing(
-    consumer: Path, run_in
+    consumer: Path, run_rulepack
 ):
-    completed = run_in(consumer, "lint", "--only", "scan")
+    completed = run_rulepack("lint", "--only", "scan", working_directory=consumer)
 
     assert completed.returncode == 2
     assert "run `rulepack packs lock`" in completed.stderr
@@ -83,12 +89,14 @@ def test_lint_fails_with_the_lock_message_when_the_lock_is_missing(
 
 
 def test_lint_fails_with_the_lock_message_when_the_ref_changed(
-    locked_consumer: Path, lock_text: str, run_in
+    locked_consumer: Path, lock_text: str, run_rulepack
 ):
     config = locked_consumer / ".rulepack.toml"
     config.write_text(config.read_text().replace('ref = "main"', 'ref = "other"'))
 
-    completed = run_in(locked_consumer, "lint", "--only", "scan")
+    completed = run_rulepack(
+        "lint", "--only", "scan", working_directory=locked_consumer
+    )
 
     assert completed.returncode == 2
     assert "run `rulepack packs lock`" in completed.stderr
@@ -96,19 +104,21 @@ def test_lint_fails_with_the_lock_message_when_the_ref_changed(
 
 
 def test_lint_fails_when_a_selected_pack_is_not_in_the_source(
-    locked_consumer: Path, run_in
+    locked_consumer: Path, run_rulepack
 ):
     config = locked_consumer / ".rulepack.toml"
     config.write_text(config.read_text().replace("team/python-core", "team/missing"))
 
-    completed = run_in(locked_consumer, "lint", "--only", "scan")
+    completed = run_rulepack(
+        "lint", "--only", "scan", working_directory=locked_consumer
+    )
 
     assert completed.returncode == 2
     assert "source 'team' has no pack 'missing'" in completed.stderr
 
 
 def test_lint_names_both_packs_when_two_packs_define_the_same_check(
-    tmp_path: Path, path_consumer: Path, run_in
+    tmp_path: Path, path_consumer: Path, run_rulepack
 ):
     write_source(tmp_path / "other", {"errors": ["no-bare-except"]})
     config = path_consumer / ".rulepack.toml"
@@ -119,7 +129,7 @@ def test_lint_names_both_packs_when_two_packs_define_the_same_check(
         + '\n[sources.other]\npath = "../other"\n'
     )
 
-    completed = run_in(path_consumer, "lint", "--only", "scan")
+    completed = run_rulepack("lint", "--only", "scan", working_directory=path_consumer)
 
     assert completed.returncode == 2
     assert "'team/python-core'" in completed.stderr
@@ -128,9 +138,11 @@ def test_lint_names_both_packs_when_two_packs_define_the_same_check(
 
 @pytest.mark.usefixtures("_write_local_check_with_pack_id")
 def test_lint_uses_the_repo_check_when_it_has_a_pack_check_id(
-    locked_consumer: Path, run_in
+    locked_consumer: Path, run_rulepack
 ):
-    completed = run_in(locked_consumer, "lint", "--only", "scan")
+    completed = run_rulepack(
+        "lint", "--only", "scan", working_directory=locked_consumer
+    )
 
     assert completed.returncode == 0, completed.stderr
     assert "the repo's check no-bare-except replaces the pack check" in (
@@ -139,7 +151,7 @@ def test_lint_uses_the_repo_check_when_it_has_a_pack_check_id(
 
 
 def test_lint_fetches_the_locked_commits_when_the_cache_is_cold(
-    tmp_path: Path, locked_consumer: Path, cache_directory: Path, run_in, scan
+    tmp_path: Path, locked_consumer: Path, cache_directory: Path, run_rulepack, scan
 ):
     second = tmp_path / "second"
     write_source(second, {"errors": ["no-swallowed-exception"]})
@@ -151,7 +163,9 @@ def test_lint_fetches_the_locked_commits_when_the_cache_is_cold(
         )
         + f'\n[sources.second]\ngit = "{url}"\nref = "main"\n'
     )
-    assert run_in(locked_consumer, "packs", "lock").returncode == 0
+    assert (
+        run_rulepack("packs", "lock", working_directory=locked_consumer).returncode == 0
+    )
     shutil.rmtree(cache_directory, onexc=fetch.retry_after_making_writable)
 
     exit_code, report = scan(locked_consumer)
@@ -177,20 +191,24 @@ def test_lint_scans_changed_files_with_pack_checks_when_asked_for_changes(
 
 
 def test_lint_fails_when_the_configured_sgconfig_is_missing_and_packs_are_selected(
-    locked_consumer: Path, run_in
+    locked_consumer: Path, run_rulepack
 ):
     config = locked_consumer / ".rulepack.toml"
     config.write_text('sgconfig = "checks/sgconfig.yml"\n' + config.read_text())
 
-    completed = run_in(locked_consumer, "lint", "--only", "scan")
+    completed = run_rulepack(
+        "lint", "--only", "scan", working_directory=locked_consumer
+    )
 
     assert completed.returncode == 2
     assert "no ast-grep config at" in completed.stderr
 
 
 @pytest.mark.usefixtures("_write_pack_rule_without_id")
-def test_lint_names_the_file_when_a_pack_rule_has_no_id(path_consumer: Path, run_in):
-    completed = run_in(path_consumer, "lint", "--only", "scan")
+def test_lint_names_the_file_when_a_pack_rule_has_no_id(
+    path_consumer: Path, run_rulepack
+):
+    completed = run_rulepack("lint", "--only", "scan", working_directory=path_consumer)
 
     assert completed.returncode == 2
     assert "no-bare-except.yml has a rule with no id" in completed.stderr
@@ -206,9 +224,9 @@ def test_lint_scans_when_the_pack_rule_tests_are_broken(path_consumer: Path, sca
 
 @pytest.mark.usefixtures("_write_pack_rule_test_as_a_list")
 def test_lint_names_the_file_when_a_pack_rule_test_is_not_a_mapping(
-    path_consumer: Path, run_in
+    path_consumer: Path, run_rulepack
 ):
-    completed = run_in(path_consumer, "lint", "--only", "test")
+    completed = run_rulepack("lint", "--only", "test", working_directory=path_consumer)
 
     assert completed.returncode == 2
     assert "no-bare-except-test.yml: every rule test must be a mapping" in (
