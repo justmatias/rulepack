@@ -1,6 +1,7 @@
 import argparse
 import importlib.metadata
 import importlib.resources
+import json
 import logging
 import re
 import sys
@@ -12,6 +13,8 @@ import yaml
 from rulepack.config import CONFIG_FILE_NAME, StrictModel
 from rulepack.config.project_paths import find_git_root
 from rulepack.lint.command import main as run_lint
+from rulepack.packs.command import main as run_packs
+from rulepack.packs.lock import BARE_KEY
 
 logger = logging.getLogger(__name__)
 
@@ -27,6 +30,12 @@ LIST_ITEM = re.compile(r"^(?P<indent>\s*)-\s")
 
 class InitError(Exception):
     pass
+
+
+class SourceArgument(StrictModel):
+    name: str
+    git: str
+    ref: str
 
 
 class PlannedFile(StrictModel):
@@ -63,12 +72,33 @@ def plan_new_file(path: Path, content: str) -> PlannedFile:
     return PlannedFile(path=path, action="create", content=content)
 
 
-def plan_layout(root: Path, checks_dir: str | None) -> list[PlannedFile]:
+def render_sources(sources: list[SourceArgument]) -> str:
+    """An empty `packs` selection and a `[sources]` table per source."""
+    if not sources:
+        return ""
+    tables = "".join(
+        f"\n[sources.{source.name}]\ngit = {json.dumps(source.git)}\n"
+        f"ref = {json.dumps(source.ref)}\n"
+        for source in sources
+    )
+    return (
+        '# Select packs as "<source>/<pack>"; `rulepack packs list` shows them.\n'
+        f"packs = []\n{tables}\n"
+    )
+
+
+def plan_layout(
+    root: Path, checks_dir: str | None, sources: list[SourceArgument]
+) -> list[PlannedFile]:
     """The config, plus a local checks folder when the repo keeps its own checks."""
     local_checks = f'sgconfig = "{checks_dir}/sgconfig.yml"\n\n' if checks_dir else ""
     config = plan_new_file(
         root / CONFIG_FILE_NAME,
-        render_template("rulepack.toml", local_checks=local_checks),
+        render_template(
+            "rulepack.toml",
+            sources=render_sources(sources),
+            local_checks=local_checks,
+        ),
     )
     if checks_dir is None:
         return [config]
@@ -193,7 +223,7 @@ def build_plan(root: Path, arguments: argparse.Namespace) -> list[PlannedFile]:
             existing.relative_to(root),
         )
     else:
-        plan.extend(plan_layout(root, choose_checks_dir(arguments)))
+        plan.extend(plan_layout(root, choose_checks_dir(arguments), arguments.source))
     version = read_rulepack_version()
     if arguments.pre_commit:
         plan.append(plan_pre_commit(root, version))
@@ -246,6 +276,17 @@ def parse_relative_folder(value: str) -> str:
     return path.as_posix()
 
 
+def parse_source_argument(value: str) -> SourceArgument:
+    name, separator, location = value.partition("=")
+    git, at, ref = location.rpartition("@")
+    if not (separator and at and git and ref) or not BARE_KEY.fullmatch(name):
+        raise argparse.ArgumentTypeError(
+            f"'{value}' must look like <name>=<git url>@<ref>, "
+            "with a name of letters, digits, '-' or '_'"
+        )
+    return SourceArgument(name=name, git=git, ref=ref)
+
+
 def parse_arguments(argv: list[str] | None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         prog="rulepack init",
@@ -279,12 +320,27 @@ def parse_arguments(argv: list[str] | None) -> argparse.Namespace:
         help="Add lint-rules and lint-rules-changed targets to the Makefile.",
     )
     parser.add_argument(
+        "--source",
+        type=parse_source_argument,
+        action="append",
+        default=[],
+        metavar="NAME=URL@REF",
+        help=(
+            "Declare a pack source in the new .rulepack.toml and lock it in "
+            "rulepack.lock. Repeatable."
+        ),
+    )
+    parser.add_argument(
         "--dry-run", action="store_true", help="Print the plan and write nothing."
     )
     parser.add_argument(
         "--yes", action="store_true", help="Write without asking for confirmation."
     )
-    return parser.parse_args(argv)
+    arguments = parser.parse_args(argv)
+    names = [source.name for source in arguments.source]
+    if duplicates := sorted({name for name in names if names.count(name) > 1}):
+        parser.error(f"--source names must be unique: {', '.join(duplicates)}")
+    return arguments
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -305,15 +361,23 @@ def main(argv: list[str] | None = None) -> int:
         return 2
     logger.info("init: plan for %s", root)
     show_plan(plan, root)
-    if all(planned.action == "exists, skipped" for planned in plan):
+    has_files_to_write = any(planned.action != "exists, skipped" for planned in plan)
+    if not has_files_to_write and not arguments.source:
         logger.info("init: nothing to write")
         return 0
     if arguments.dry_run:
         logger.info("init: dry run, nothing written")
         return 0
-    if not arguments.yes and not ask_yes_no("Write these files?"):
-        logger.info("init: nothing written")
-        return 1
-    write_plan(plan)
+    if has_files_to_write:
+        if not arguments.yes and not ask_yes_no("Write these files?"):
+            logger.info("init: nothing written")
+            return 1
+        write_plan(plan)
+    if arguments.source:
+        # `packs lock` keeps pins it already has, so a rerun after a failed fetch
+        # finishes the lock instead of skipping it.
+        logger.info("init: locking the sources in rulepack.lock")
+        if run_packs(["lock"]) != 0:
+            return 1
     logger.info("init: done; running rulepack lint on the new layout")
     return run_lint([])
