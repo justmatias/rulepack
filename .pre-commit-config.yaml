@@ -64,6 +64,7 @@ repos:
           - pydantic==2.14.4
           - pytest==9.2.0
           - pyyaml==6.0.4
+          - tomli-w==1.2.0
           - types-pyyaml==6.0.12.20261122
 
   - repo: https://github.com/pre-commit/mirrors-mypy
@@ -75,6 +76,7 @@ repos:
           - pydantic==2.14.4
           - pytest==9.2.0
           - pyyaml==6.0.4
+          - tomli-w==1.2.0
           - types-pyyaml==6.0.12.20261122
 
   # The rule checks from mstack's published hooks, until rulepack can load packs

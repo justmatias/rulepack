@@ -1,14 +1,13 @@
-import json
-import re
 import tempfile
 import tomllib
 from pathlib import Path
 
+import tomli_w
 from pydantic import Field, ValidationError
 
 from rulepack.config import ConfigError, StrictModel
 
-BARE_KEY = re.compile(r"[A-Za-z0-9_-]+")
+LOCK_HEADER = "# Written by `rulepack packs lock`. Commit this file.\n\n"
 
 
 class LockEntry(StrictModel):
@@ -30,22 +29,9 @@ def read_lock(path: Path) -> Lock:
         raise ConfigError(f"{path}: {error}") from error
 
 
-def format_toml_key(name: str) -> str:
-    return name if BARE_KEY.fullmatch(name) else json.dumps(name)
-
-
 def render_lock(lock: Lock) -> str:
-    lines = ["# Written by `rulepack packs lock`. Commit this file.", ""]
-    for name in sorted(lock.sources):
-        entry = lock.sources[name]
-        lines += [
-            f"[sources.{format_toml_key(name)}]",
-            f"git = {json.dumps(entry.git)}",
-            f"ref = {json.dumps(entry.ref)}",
-            f"commit = {json.dumps(entry.commit)}",
-            "",
-        ]
-    return "\n".join(lines).rstrip("\n") + "\n"
+    sources = {name: lock.sources[name].model_dump() for name in sorted(lock.sources)}
+    return LOCK_HEADER + tomli_w.dumps({"sources": sources})
 
 
 def write_lock(path: Path, lock: Lock) -> None:
