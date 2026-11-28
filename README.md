@@ -2,7 +2,7 @@
 
 Run ast-grep and import-linter checks from shared, versioned rule packs in any repo.
 
-**Status: no shared packs yet.** `rulepack` runs a repo's own checks: ast-grep rule tests and scans, and import-linter contracts, from the CLI, pre-commit, GitHub Actions and agent hooks. Loading packs from other repos is planned in [pack-sources](docs/specs/pack-sources.md). Repos that select mstack's bundled packs (`packs = [...]` in `.mstack.toml`) stay on mstack `v6.x` until then.
+A repo runs its own checks and the checks of **packs** it selects from **sources**: git repos or local folders with a `packs.toml`. A checked-in `rulepack.lock` pins each git source, so a check fix reaches a repo through `rulepack packs update`, without a rulepack release. No check ships inside rulepack.
 
 ## Install
 
@@ -42,9 +42,10 @@ rulepack lint
 
 | Command | What it does |
 | --- | --- |
-| `rulepack init` | Writes `.rulepack.toml`, and with `--checks-dir DIR` an ast-grep sgconfig with empty `rules/` and `rule-tests/` for the repo's own checks. `--pre-commit`, `--ci github` and `--makefile` add the hooks, the workflow and the Make targets. It shows the plan, asks first (`--yes` skips, `--dry-run` writes nothing) and never overwrites a file, so a second run changes nothing. |
+| `rulepack init` | Writes `.rulepack.toml`, and with `--checks-dir DIR` an ast-grep sgconfig with empty `rules/` and `rule-tests/` for the repo's own checks. `--pre-commit`, `--ci github` and `--makefile` add the hooks, the workflow and the Make targets, and `--source NAME=URL@REF` declares a pack source and locks it. It shows the plan, asks first (`--yes` skips, `--dry-run` writes nothing) and never overwrites a file, so a second run changes nothing. |
 | `rulepack lint` | Runs the checks below. |
 | `rulepack config` | Prints the resolved config and where each value comes from (`--json` for JSON). |
+| `rulepack packs lock`, `update`, `list` | Pin, update and list the pack sources (below). |
 | `rulepack hook post-edit`, `rulepack hook stop` | Agent hooks (below). |
 
 ### `rulepack lint`
@@ -84,6 +85,68 @@ timeout = 10.0                   # seconds per agent hook run
 base_ref = "origin/main"
 ```
 
+### Pack sources
+
+Any git repo or folder with a `packs.toml` at its root is a source:
+
+```toml
+# Optional. These are the defaults, relative to the source root.
+checks_dir = "lint/rules"
+tests_dir = "lint/rule-tests"
+
+[packs.python-core]
+checks = ["no-bare-except", "no-swallowed-exception"]
+```
+
+Each check is `<checks_dir>/<id>.yml`, and its rule tests, when the source has them, are `<tests_dir>/<id>-test.yml`. Every path must stay inside the source.
+
+A repo declares sources and selects packs as `<source>/<pack>`. There is no default source:
+
+```toml
+packs = ["mstack/python-core", "mstack/testing", "team/backend"]
+
+[sources.mstack]
+git = "https://github.com/justmatias/mstack"
+ref = "vX.Y.Z"           # a tag, branch or SHA; the lock pins the commit
+
+[sources.team]
+path = "../team-rules"   # relative to this file; not locked
+
+[pack_overrides]
+disable = ["no-manual-init-boilerplate"]
+severity = { no-sleep-in-tests = "warning" }
+```
+
+- `rulepack packs lock` resolves each new or changed git source to a commit, writes `rulepack.lock` next to the config, and fetches it. Running it again changes nothing. Commit the lock.
+- `rulepack packs update [SOURCE ...]` re-resolves the refs (all sources by default) and rewrites the lock. Pin a tag or a SHA, so `update` is the only thing that moves a source.
+- `rulepack packs list [--json]` lists each source's packs, checks and locked commit.
+- `rulepack lint` runs the packs' checks and rule tests next to the repo's own. It fetches a locked commit when the cache lacks it, and never writes the lock: a git source missing from the lock, or whose `git` or `ref` changed, fails with a message to run `rulepack packs lock`. `--changed` in CI warns about a path source outside the repo.
+- A repo's own check wins over a pack check with the same ID, and lint says so. Two selected packs with the same ID is an error that names both sources. IDs are never rewritten, so `ast-grep-ignore: <id>` and `[pack_overrides]` use bare IDs.
+- Sources are cached in `$XDG_CACHE_HOME/rulepack/sources/`, one extracted folder per commit. git's own credentials reach private sources; rulepack stores none.
+
+**Host defaults.** `$XDG_CONFIG_HOME/rulepack/config.toml` may hold `packs` and `[sources]`, locked with `rulepack packs lock --host` (run outside a configured repo). They apply only in repos without `.rulepack.toml`, so agent hooks can check those too. A repo's config replaces them, and CI never reads them.
+
+**Agent hooks never fetch.** When a locked commit is not cached, the hook runs the repo's own checks, skips the pack checks, and logs one line saying to run `rulepack packs lock`.
+
+### Migrating from mstack v6 packs
+
+Rename `.mstack.toml` to `.rulepack.toml`, change each bare pack name to `mstack/<name>` (`python-core` becomes `mstack/python-core`), add the source, and lock it:
+
+```toml
+packs = ["mstack/python-core", "mstack/testing"]
+
+[sources.mstack]
+git = "https://github.com/justmatias/mstack"
+ref = "vX.Y.Z"   # an mstack release with packs.toml
+```
+
+```bash
+rulepack packs lock
+git add .rulepack.toml rulepack.lock
+```
+
+Then switch the pre-commit `repo:` and the Action from mstack to rulepack, with `rulepack-*` hook ids.
+
 ### pre-commit
 
 ```yaml
@@ -114,7 +177,7 @@ Inputs: `mode` (`full`, `changed` or `both`), `base-ref`, `rulepack-version`, `p
 
 ### Agent hooks
 
-`rulepack hook post-edit` and `rulepack hook stop` read a Claude Code, Codex or Cursor hook payload on stdin. They run only in repos with `.rulepack.toml`. Post-edit scans the edited files; stop scans the changed files, and reports the same findings only once per session. A run that times out or fails logs a warning and lets the agent continue. Set `[hooks] enabled = false` to turn them off for a repo.
+`rulepack hook post-edit` and `rulepack hook stop` read a Claude Code, Codex or Cursor hook payload on stdin. They run only in repos with `.rulepack.toml`, or in any git repo when host defaults are set (see Pack sources). Post-edit scans the edited files; stop scans the changed files, and reports the same findings only once per session. A run that times out or fails logs a warning and lets the agent continue. Set `[hooks] enabled = false` to turn them off for a repo.
 
 ## Development
 

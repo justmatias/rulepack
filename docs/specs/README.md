@@ -4,9 +4,7 @@ Implementation plans for rulepack. Each spec says what it depends on, what it ch
 
 ## Next
 
-| Spec | Summary | Depends on |
-| --- | --- | --- |
-| [pack-sources](pack-sources.md) | Run checks from one or more git or path sources, pinned by a lockfile | mstack's [cleanup](https://github.com/justmatias/mstack/blob/main/docs/specs/mstack-uses-rulepack.md) |
+No spec is planned right now.
 
 ## Writing a spec
 
