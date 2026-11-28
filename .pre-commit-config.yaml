@@ -77,13 +77,17 @@ repos:
           - pyyaml==6.0.4
           - types-pyyaml==6.0.12.20261122
 
-  # The rule checks from mstack's published hooks, until rulepack can load packs
-  # from a source. The packs come from .mstack.toml.
+  # rulepack lints itself with this checkout's code and the packs in .rulepack.toml.
+  - repo: local
+    hooks:
+      - id: rulepack-lint
+        name: rulepack lint (ast-grep scan of the staged files)
+        entry: uv run --frozen rulepack lint --only scan --files
+        language: system
+        types: [python]
+
+  # rulepack does not check commit messages; mstack's hook still does.
   - repo: https://github.com/justmatias/mstack
     rev: v6.7.1
     hooks:
-      - id: mstack-lint
-        exclude: ^tests/fixtures/
-      - id: mstack-exceptions
-        exclude: ^tests/fixtures/
       - id: mstack-commit-msg
