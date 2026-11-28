@@ -21,13 +21,13 @@ uvx rulepack --version
 Until the first PyPI release is available, install from the GitHub release tag:
 
 ```bash
-uv tool install git+https://github.com/justmatias/rulepack@v0.7.0
+uv tool install git+https://github.com/justmatias/rulepack@v0.8.0
 ```
 
 Or run it without installing:
 
 ```bash
-uvx --from git+https://github.com/justmatias/rulepack@v0.7.0 rulepack --version
+uvx --from git+https://github.com/justmatias/rulepack@v0.8.0 rulepack --version
 ```
 
 ## Development

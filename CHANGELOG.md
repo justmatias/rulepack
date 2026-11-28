@@ -2,6 +2,43 @@
 
 <!-- version list -->
 
+## v0.8.0 (2026-11-28)
+
+### Bug Fixes
+
+- **packs**: List a commit only for a source that is still git
+  ([`eeca04e`](https://github.com/justmatias/rulepack/commit/eeca04e7d479b2bb9395d900af3b96558bed987a))
+
+- **packs**: Write the lock with LF line endings on every OS
+  ([`220c438`](https://github.com/justmatias/rulepack/commit/220c438153603598572e217cd7b6033673950957))
+
+### Chores
+
+- **ci**: Prepare rulepack releases for PyPI ([#27](https://github.com/justmatias/rulepack/pull/27),
+  [`a2089cd`](https://github.com/justmatias/rulepack/commit/a2089cd3197a8dbdc3a8c1a60c85f3ee666b4dd0))
+
+### Documentation
+
+- Document installing rulepack from PyPI ([#28](https://github.com/justmatias/rulepack/pull/28),
+  [`de0da11`](https://github.com/justmatias/rulepack/commit/de0da111b095fa52ed8f675e3ecee2ad36f93008))
+
+### Features
+
+- **packs**: Lock, update and list pack sources
+  ([`bed647b`](https://github.com/justmatias/rulepack/commit/bed647b776464fd6c7dcf43dedd6654595eb0855))
+
+### Testing
+
+- Import the git helpers from their shared module
+  ([`b25597d`](https://github.com/justmatias/rulepack/commit/b25597d232252dcd4e55201aa8fdb9ce725916dc))
+
+- **packs**: Cover a locked commit that no ref points at any more
+  ([`f6e39cb`](https://github.com/justmatias/rulepack/commit/f6e39cb214ae4f159d71b949ff7ecc35bab0af72))
+
+- **packs**: Drop an unused argument from the force-push test
+  ([`6abb13a`](https://github.com/justmatias/rulepack/commit/6abb13a74a6069c9f262565ebf286bad5291f297))
+
+
 ## v0.7.0 (2026-11-28)
 
 ### Features
