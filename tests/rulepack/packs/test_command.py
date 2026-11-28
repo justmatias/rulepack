@@ -140,3 +140,7 @@ def test_fetch_clone_keeps_the_other_clone_when_a_parallel_run_finished_first(
 
     assert clone == clone_path
     assert [path.name for path in clone.parent.iterdir()] == ["clone.git"]
+
+
+def test_lock_writes_lf_line_endings_when_run_on_any_platform(locked_consumer: Path):
+    assert b"\r" not in (locked_consumer / "rulepack.lock").read_bytes()

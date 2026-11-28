@@ -51,10 +51,17 @@ def render_lock(lock: Lock) -> str:
 def write_lock(path: Path, lock: Lock) -> None:
     """Write through a temporary file and a rename; an unchanged lock is not touched."""
     text = render_lock(lock)
-    if path.is_file() and path.read_text(encoding="utf-8") == text:
+    if path.is_file() and path.read_bytes() == text.encode("utf-8"):
         return
+    # newline="\n": the same bytes on every OS, so a lock written on Windows
+    # does not churn against one written elsewhere.
     with tempfile.NamedTemporaryFile(
-        "w", dir=path.parent, delete=False, encoding="utf-8", suffix=".tmp"
+        "w",
+        dir=path.parent,
+        delete=False,
+        encoding="utf-8",
+        newline="\n",
+        suffix=".tmp",
     ) as pending:
         pending.write(text)
     Path(pending.name).replace(path)
