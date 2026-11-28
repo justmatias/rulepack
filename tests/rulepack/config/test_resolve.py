@@ -100,6 +100,6 @@ def test_config_fails_with_rename_message_when_only_mstack_toml_sets_lint_keys(
 def test_config_ignores_mstack_toml_when_it_sets_no_lint_keys(
     git_repository: Path, write_config
 ):
-    write_config('packs = ["python-core"]\n', name=".mstack.toml")
+    write_config("# only comments\n", name=".mstack.toml")
 
     assert resolve_config(start=git_repository).file is None

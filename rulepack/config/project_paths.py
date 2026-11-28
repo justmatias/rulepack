@@ -1,8 +1,16 @@
+import os
 from pathlib import Path
 
 CONFIG_FILE_NAME = ".rulepack.toml"
 # mstack v6 read the same keys from this file.
 LEGACY_CONFIG_FILE_NAME = ".mstack.toml"
+LOCK_FILE_NAME = "rulepack.lock"
+
+
+def find_host_config_path() -> Path:
+    """This machine's defaults, for repos without a config file."""
+    directory = Path(os.environ.get("XDG_CONFIG_HOME") or Path.home() / ".config")
+    return directory / "rulepack" / "config.toml"
 
 
 def find_git_root(start: Path) -> Path | None:

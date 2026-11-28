@@ -1,0 +1,5 @@
+# rulepack reads this file; the pinned mstack hooks still read .mstack.toml.
+
+[scan]
+# A sample repo whose invalid/ folder breaks the checks on purpose.
+exclude = ["tests/fixtures/**"]
