@@ -86,3 +86,20 @@ def test_config_is_not_found_when_it_is_above_the_git_root(git_repository: Path)
 
     assert config.file is None
     assert config.values.sgconfig == git_repository / "lint/sgconfig.yml"
+
+
+def test_config_fails_with_rename_message_when_only_mstack_toml_sets_lint_keys(
+    git_repository: Path, write_config
+):
+    write_config('sgconfig = "checks/sgconfig.yml"\n', name=".mstack.toml")
+
+    with pytest.raises(ConfigError, match=r"rename the file to \.rulepack\.toml"):
+        resolve_config(start=git_repository)
+
+
+def test_config_ignores_mstack_toml_when_it_sets_no_lint_keys(
+    git_repository: Path, write_config
+):
+    write_config('packs = ["python-core"]\n', name=".mstack.toml")
+
+    assert resolve_config(start=git_repository).file is None

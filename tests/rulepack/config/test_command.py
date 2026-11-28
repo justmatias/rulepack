@@ -34,3 +34,14 @@ def test_command_exits_with_message_when_config_is_invalid(
 
     assert completed.returncode == 2
     assert ".rulepack.toml" in completed.stderr
+
+
+def test_lint_exits_with_rename_message_when_only_mstack_toml_sets_lint_keys(
+    run_rulepack, write_config, git_repository
+):
+    write_config('sgconfig = "lint/sgconfig.yml"\n', name=".mstack.toml")
+
+    completed = run_rulepack("lint", working_directory=git_repository)
+
+    assert completed.returncode == 2
+    assert "rename the file to .rulepack.toml" in completed.stderr
