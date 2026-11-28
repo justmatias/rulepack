@@ -4,6 +4,12 @@ Run ast-grep and import-linter checks from shared, versioned rule packs in any r
 
 **Status: under construction.** The CLI only answers `--version` and `--help` for now. The linter moves here from [mstack](https://github.com/justmatias/mstack), as planned in [mstack's specs](https://github.com/justmatias/mstack/tree/main/docs/specs).
 
+## Why
+
+Agents write more of the code now, and reviewing it means correcting the same preferences again and again: a naming habit, a test layout, an import boundary. If an agent writes the code and you review it, it should write the code the way you would.
+
+Prose rules in Markdown help, but an agent follows them only some of the time. rulepack turns those preferences into static, deterministic checks wherever a check can express them, so a broken rule fails the same way every time and the agent fixes it before you see the diff. Packs make the rules portable: write them once, version them, and select them from any repo.
+
 ## Install
 
 You need [`uv`](https://docs.astral.sh/uv/). Once the first release is available on [PyPI](https://pypi.org/project/rulepack/), install the CLI with:
