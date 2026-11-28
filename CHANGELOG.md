@@ -2,6 +2,35 @@
 
 <!-- version list -->
 
+## v0.8.0 (2026-11-28)
+
+### Bug Fixes
+
+- **init**: Reject an .mstack.toml that still holds lint keys
+  ([`0b30c18`](https://github.com/justmatias/rulepack/commit/0b30c18ef31d645b664c94aae9d2f3a7773a95f3))
+
+### Continuous Integration
+
+- Run the lint action on the sample repo
+  ([`0395789`](https://github.com/justmatias/rulepack/commit/0395789d9ed606acae06b8ac6a36016b897ad59c))
+
+### Documentation
+
+- Document rulepack's commands and remove the migration spec
+  ([`7038c12`](https://github.com/justmatias/rulepack/commit/7038c1225337abbee879bca50bf0f5841532357a))
+
+### Features
+
+- **config**: Declare pack sources, overrides and host defaults
+  ([`65bf07b`](https://github.com/justmatias/rulepack/commit/65bf07b1ce00cb0bbce8408ae58467b8fe6b1261))
+
+- **config**: Reject an .mstack.toml that still holds lint keys
+  ([`44e8f93`](https://github.com/justmatias/rulepack/commit/44e8f939d7d2f4d34f77491a112ddceff3da4ac2))
+
+- **packs**: Lock, update and list pack sources
+  ([`ce29089`](https://github.com/justmatias/rulepack/commit/ce29089bb5c2edb58357cb65238f4f74a053a31c))
+
+
 ## v0.7.0 (2026-11-28)
 
 ### Features
