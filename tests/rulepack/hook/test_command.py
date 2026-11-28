@@ -39,29 +39,20 @@ def test_post_edit_is_silent_when_repository_has_no_config(
     assert (result.returncode, result.stdout, result.stderr) == QUIET
 
 
-def test_post_edit_is_silent_when_file_is_excluded(lint_sandbox, run_hook):
-    target = lint_sandbox / "invalid" / "target.py"
-    target.write_text(BARE_EXCEPT, encoding="utf-8")
-
-    result = run_hook(lint_sandbox, "post-edit", tool_input={"file_path": str(target)})
-
-    assert (result.returncode, result.stdout, result.stderr) == QUIET
-
-
-def test_post_edit_is_silent_when_extension_is_not_scanned(lint_sandbox, run_hook):
-    target = lint_sandbox / "target.txt"
-    target.write_text(BARE_EXCEPT, encoding="utf-8")
-
-    result = run_hook(lint_sandbox, "post-edit", tool_input={"file_path": str(target)})
+def test_post_edit_is_silent_when_file_is_not_scanned(
+    lint_sandbox, run_hook, unscanned_target
+):
+    result = run_hook(
+        lint_sandbox, "post-edit", tool_input={"file_path": str(unscanned_target)}
+    )
 
     assert (result.returncode, result.stdout, result.stderr) == QUIET
 
 
 def test_post_edit_is_silent_when_hooks_are_disabled(
-    lint_sandbox, run_hook, violating_target
+    lint_sandbox, run_hook, violating_target, append_config
 ):
-    with (lint_sandbox / ".rulepack.toml").open("a", encoding="utf-8") as stream:
-        stream.write("\n[hooks]\nenabled = false\n")
+    append_config("[hooks]\nenabled = false\n")
 
     result = run_hook(
         lint_sandbox, "post-edit", tool_input={"file_path": str(violating_target)}
@@ -71,14 +62,23 @@ def test_post_edit_is_silent_when_hooks_are_disabled(
 
 
 @pytest.mark.usefixtures("violating_target")
-def test_post_edit_warns_when_time_budget_expires(lint_sandbox, run_hook):
-    with (lint_sandbox / ".rulepack.toml").open("a", encoding="utf-8") as stream:
-        stream.write("\n[hooks]\ntimeout = 0.000001\n")
+def test_post_edit_warns_when_time_budget_expires(
+    lint_sandbox, run_hook, append_config
+):
+    append_config("[hooks]\ntimeout = 0.000001\n")
 
     result = run_hook(lint_sandbox, "post-edit", tool_input={"file_path": "target.py"})
 
     assert result.returncode == 0
     assert "timed out" in result.stderr
+
+
+@pytest.mark.usefixtures("violating_target")
+def test_post_edit_warns_when_payload_is_malformed(lint_sandbox, run_hook):
+    result = run_hook(lint_sandbox, "post-edit", tool_input="target.py")
+
+    assert (result.returncode, result.stdout) == (0, "")
+    assert "validation error" in result.stderr
 
 
 @pytest.mark.usefixtures("violating_target")
