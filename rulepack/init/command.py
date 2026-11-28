@@ -361,21 +361,21 @@ def main(argv: list[str] | None = None) -> int:
         return 2
     logger.info("init: plan for %s", root)
     show_plan(plan, root)
-    if all(planned.action == "exists, skipped" for planned in plan):
+    has_files_to_write = any(planned.action != "exists, skipped" for planned in plan)
+    if not has_files_to_write and not arguments.source:
         logger.info("init: nothing to write")
         return 0
     if arguments.dry_run:
         logger.info("init: dry run, nothing written")
         return 0
-    if not arguments.yes and not ask_yes_no("Write these files?"):
-        logger.info("init: nothing written")
-        return 1
-    write_plan(plan)
-    wrote_config_with_sources = arguments.source and any(
-        planned.path.name == CONFIG_FILE_NAME and planned.action == "create"
-        for planned in plan
-    )
-    if wrote_config_with_sources:
+    if has_files_to_write:
+        if not arguments.yes and not ask_yes_no("Write these files?"):
+            logger.info("init: nothing written")
+            return 1
+        write_plan(plan)
+    if arguments.source:
+        # `packs lock` keeps pins it already has, so a rerun after a failed fetch
+        # finishes the lock instead of skipping it.
         logger.info("init: locking the sources in rulepack.lock")
         if run_packs(["lock"]) != 0:
             return 1
