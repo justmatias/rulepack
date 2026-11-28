@@ -30,7 +30,7 @@ def describe_sources(config: ResolvedConfig) -> dict[str, SourceDescription]:
             git=source.git,
             ref=source.ref,
             path=str(source.path) if source.path else None,
-            commit=entry.commit if entry else None,
+            commit=entry.commit if entry and source.git else None,
             packs={
                 pack: list(manifest.packs[pack].checks)
                 for pack in sorted(manifest.packs)

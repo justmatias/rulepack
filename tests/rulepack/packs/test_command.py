@@ -144,3 +144,16 @@ def test_fetch_clone_keeps_the_other_clone_when_a_parallel_run_finished_first(
 
 def test_lock_writes_lf_line_endings_when_run_on_any_platform(locked_consumer: Path):
     assert b"\r" not in (locked_consumer / "rulepack.lock").read_bytes()
+
+
+def test_list_reports_no_commit_when_a_locked_source_became_a_path(
+    locked_consumer: Path, source_work: Path, run_in
+):
+    (locked_consumer / ".rulepack.toml").write_text(
+        f'[sources.team]\npath = "{source_work.as_posix()}"\n'
+    )
+
+    completed = run_in(locked_consumer, "packs", "list", "--json")
+
+    assert completed.returncode == 0, completed.stderr
+    assert json.loads(completed.stdout)["team"]["commit"] is None
