@@ -1,7 +1,7 @@
 import subprocess
 from pathlib import Path
 
-from tests.helpers import init_git_repository, run_git
+from tests.rulepack.helpers import init_git_repository, run_git
 
 SAMPLE_CHECKS = Path(__file__).resolve().parents[2] / "fixtures" / "lint"
 

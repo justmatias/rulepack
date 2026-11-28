@@ -3,7 +3,7 @@ from pathlib import Path
 
 import pytest
 
-from tests.helpers import init_git_repository
+from tests.rulepack.helpers import init_git_repository
 from tests.rulepack.packs.helpers import publish_source, write_source
 
 
