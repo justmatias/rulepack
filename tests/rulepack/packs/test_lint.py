@@ -202,3 +202,13 @@ def test_lint_scans_when_the_pack_rule_tests_are_broken(path_consumer: Path, sca
 
     assert exit_code == 1
     assert report["scan"]["findings"][0]["rule"] == "no-bare-except"
+
+
+@pytest.mark.usefixtures("_write_pack_rule_test_as_a_list")
+def test_lint_names_the_file_when_a_pack_rule_test_is_not_a_mapping(
+    path_consumer: Path, run_in
+):
+    completed = run_in(path_consumer, "lint", "--only", "test")
+
+    assert completed.returncode == 2
+    assert "every rule test must be a mapping" in completed.stderr

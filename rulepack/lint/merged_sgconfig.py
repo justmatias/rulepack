@@ -106,11 +106,14 @@ def write_pack_tests(directory: Path, packs: list[Pack], selected: set[str]) -> 
     directory.mkdir()
     tests = sorted({test for pack in packs for test in pack.tests})
     for index, path in enumerate(tests):
-        cases = [
-            case
-            for case in yaml.safe_load_all(path.read_text(encoding="utf-8"))
-            if case and case.get("id") in selected
+        documents = [
+            document
+            for document in yaml.safe_load_all(path.read_text(encoding="utf-8"))
+            if document is not None
         ]
+        if not all(isinstance(document, dict) for document in documents):
+            raise ConfigError(f"{path}: every rule test must be a mapping")
+        cases = [case for case in documents if case.get("id") in selected]
         if cases:
             (directory / f"{index}.yml").write_text(
                 yaml.safe_dump_all(cases), encoding="utf-8"
