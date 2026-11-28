@@ -27,7 +27,7 @@ def parse_patch_paths(patch: str) -> list[str]:
 
 
 class ToolInput(BaseModel):
-    file_path: str | None = None
+    file_path: Path | None = None
     command: str | None = None
 
 
@@ -36,27 +36,27 @@ class HookPayload(BaseModel):
 
     model_config = ConfigDict(coerce_numbers_to_str=True)
 
-    cwd: str | None = None
-    workspace_roots: list[str] = Field(default_factory=list)
-    file_path: str | None = None
+    cwd: Path | None = None
+    workspace_roots: list[Path] = Field(default_factory=list)
+    file_path: Path | None = None
     tool_name: str | None = None
-    tool_input: ToolInput | None = None
+    tool_input: ToolInput = Field(default_factory=ToolInput)
     session_id: str = ""
 
     def resolve_directory(self) -> Path:
         """The agent's cwd, else the workspace root that holds the edited file."""
-        if self.cwd:
-            return Path(self.cwd).resolve()
+        if self.cwd is not None:
+            return self.cwd.resolve()
         if self.file_path is not None:
-            edited = Path(self.file_path).resolve()
+            edited = self.file_path.resolve()
             for workspace in self.workspace_roots:
-                if edited.is_relative_to(root := Path(workspace).resolve()):
+                if edited.is_relative_to(root := workspace.resolve()):
                     return root
         return Path.cwd()
 
     def list_edited_paths(self, directory: Path) -> list[Path]:
-        if self.tool_name == "apply_patch" and self.tool_input is not None:
+        if self.tool_name == "apply_patch":
             patch = self.tool_input.command or ""
             return [(directory / path).resolve() for path in parse_patch_paths(patch)]
-        path = self.tool_input.file_path if self.tool_input else self.file_path
+        path = self.tool_input.file_path or self.file_path
         return [(directory / path).resolve()] if path else []
