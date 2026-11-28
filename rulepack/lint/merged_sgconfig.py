@@ -119,9 +119,13 @@ def write_pack_tests(directory: Path, packs: list[Pack], selected: set[str]) -> 
 
 @contextlib.contextmanager
 def write_merged_sgconfig(
-    config: ResolvedConfig, packs: list[Pack]
+    config: ResolvedConfig, packs: list[Pack], *, include_tests: bool
 ) -> Generator[Path, None, None]:
-    """A temporary sgconfig with the repo's checks and the packs' checks and tests."""
+    """A temporary sgconfig with the repo's checks and the packs' checks.
+
+    With `include_tests`, the packs' rule tests too: a scan alone never reads them,
+    so a broken test file in a pack cannot block it.
+    """
     with tempfile.TemporaryDirectory(prefix="rulepack-packs-") as directory:
         root = Path(directory)
         data = read_local_sgconfig(config)
@@ -131,12 +135,13 @@ def write_merged_sgconfig(
             checks, collect_local_check_ids(data), overrides
         )
         write_pack_checks(root / "rules", checks, selected, overrides)
-        write_pack_tests(root / "tests", packs, selected)
         data["ruleDirs"] = [*data.get("ruleDirs", []), str(root / "rules")]
-        data["testConfigs"] = [
-            *(data.get("testConfigs") or []),
-            {"testDir": str(root / "tests")},
-        ]
+        if include_tests:
+            write_pack_tests(root / "tests", packs, selected)
+            data["testConfigs"] = [
+                *(data.get("testConfigs") or []),
+                {"testDir": str(root / "tests")},
+            ]
         path = root / "sgconfig.yml"
         path.write_text(yaml.safe_dump(data), encoding="utf-8")
         yield path

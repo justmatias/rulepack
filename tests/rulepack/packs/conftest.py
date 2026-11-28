@@ -136,3 +136,23 @@ def _write_local_check_with_pack_id(locked_consumer: Path) -> None:
         "message: Local rule\nrule: {pattern: never_called()}\n",
         encoding="utf-8",
     )
+
+
+@pytest.fixture(
+    params=[
+        lambda text: text.replace("id: no-bare-except\n", ""),
+        lambda text: text + "---\n{}\n",
+    ],
+    ids=["missing-id", "empty-rule"],
+)
+def _write_pack_rule_without_id(
+    request: pytest.FixtureRequest, source_work: Path
+) -> None:
+    check = source_work / "lint" / "rules" / "no-bare-except.yml"
+    check.write_text(request.param(check.read_text()), encoding="utf-8")
+
+
+@pytest.fixture
+def _break_pack_rule_tests(source_work: Path) -> None:
+    test = source_work / "lint" / "rule-tests" / "no-bare-except-test.yml"
+    test.write_text("id: [unclosed\n", encoding="utf-8")
