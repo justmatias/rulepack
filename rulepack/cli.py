@@ -11,6 +11,7 @@ COMMANDS = {
     "hook": "rulepack.hook.command",
     "init": "rulepack.init.command",
     "lint": "rulepack.lint.command",
+    "packs": "rulepack.packs.command",
 }
 
 
