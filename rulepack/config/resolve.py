@@ -4,7 +4,12 @@ from typing import Any
 
 from pydantic import ValidationError
 
-from rulepack.config.project_paths import find_config_path, find_git_root
+from rulepack.config.project_paths import (
+    CONFIG_FILE_NAME,
+    LEGACY_CONFIG_FILE_NAME,
+    find_config_path,
+    find_git_root,
+)
 from rulepack.config.settings import ProjectConfig, ResolvedConfig, Source
 
 # Keys whose values are paths (or lists of paths) relative to the config file.
@@ -23,6 +28,19 @@ def read_toml(path: Path) -> dict[str, Any]:
         return tomllib.loads(path.read_text(encoding="utf-8"))
     except tomllib.TOMLDecodeError as error:
         raise ConfigError(f"{path}: invalid TOML ({error})") from error
+
+
+def reject_legacy_config(start: Path, git_root: Path | None) -> None:
+    """Fail on an mstack config that still holds lint keys, instead of ignoring it."""
+    path = find_config_path(start, git_root, LEGACY_CONFIG_FILE_NAME)
+    if path is None:
+        return
+    lint_keys = sorted(read_toml(path).keys() & ProjectConfig.model_fields.keys())
+    if lint_keys:
+        raise ConfigError(
+            f"{path} sets {', '.join(lint_keys)}, but rulepack reads "
+            f"{CONFIG_FILE_NAME}: rename the file to {CONFIG_FILE_NAME}"
+        )
 
 
 def flatten(data: dict[str, Any], prefix: str = "") -> dict[str, Any]:
@@ -73,6 +91,8 @@ def resolve_config(
     start = (start or current_directory).resolve()
     git_root = find_git_root(start)
     config_file = find_config_path(start, git_root)
+    if config_file is None:
+        reject_legacy_config(start, git_root)
     file_data = read_toml(config_file) if config_file else {}
     root = config_file.parent if config_file else (git_root or start)
 

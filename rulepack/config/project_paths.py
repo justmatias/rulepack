@@ -1,6 +1,8 @@
 from pathlib import Path
 
 CONFIG_FILE_NAME = ".rulepack.toml"
+# mstack v6 read the same keys from this file.
+LEGACY_CONFIG_FILE_NAME = ".mstack.toml"
 
 
 def find_git_root(start: Path) -> Path | None:
@@ -25,13 +27,15 @@ def candidate_directories(start: Path, git_root: Path | None) -> list[Path]:
     return directories
 
 
-def find_config_path(start: Path, git_root: Path | None) -> Path | None:
+def find_config_path(
+    start: Path, git_root: Path | None, name: str = CONFIG_FILE_NAME
+) -> Path | None:
     """Find the nearest config without looking above the git root."""
     return next(
         (
-            directory / CONFIG_FILE_NAME
+            directory / name
             for directory in candidate_directories(start, git_root)
-            if (directory / CONFIG_FILE_NAME).is_file()
+            if (directory / name).is_file()
         ),
         None,
     )
