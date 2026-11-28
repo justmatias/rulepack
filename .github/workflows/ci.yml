@@ -33,7 +33,7 @@ jobs:
       - name: Run pre-commit on all files
         env:
           SKIP: no-commit-to-branch
-        run: make lint
+        run: uv run poe lint
 
       # commit-msg hooks don't run with --all-files: check every commit the PR
       # adds, one message at a time, with the same command as the hook.
@@ -57,10 +57,9 @@ jobs:
           exit "$failed"
 
       - name: Tests
-        run: make test
+        run: uv run poe test
 
-  # The CLI must behave the same on every OS. `make` is a contributor
-  # convenience (bash), so this job calls pytest and rulepack directly.
+  # The CLI must behave the same on every OS.
   portability:
     name: Portability (${{ matrix.os }})
     runs-on: ${{ matrix.os }}
@@ -79,7 +78,7 @@ jobs:
           python-version: "3.12"
 
       - name: Tests
-        run: uv run pytest -q
+        run: uv run poe test
 
       - name: rulepack --version
         run: uv run rulepack --version
