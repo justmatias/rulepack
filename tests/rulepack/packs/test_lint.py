@@ -186,3 +186,15 @@ def test_lint_fails_when_the_configured_sgconfig_is_missing_and_packs_are_select
 
     assert completed.returncode == 2
     assert "no ast-grep config at" in completed.stderr
+
+
+def test_lint_names_the_file_when_a_pack_rule_has_no_id(
+    path_consumer: Path, source_work: Path, run_in
+):
+    check = source_work / "lint" / "rules" / "no-bare-except.yml"
+    check.write_text(check.read_text().replace("id: no-bare-except\n", ""))
+
+    completed = run_in(path_consumer, "lint", "--only", "scan")
+
+    assert completed.returncode == 2
+    assert "no-bare-except.yml has a rule with no id" in completed.stderr
