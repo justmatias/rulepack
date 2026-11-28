@@ -9,6 +9,6 @@ repos:
     hooks:
       - id: lint-rules
         name: lint-rules
-        entry: make lint-rules
+        entry: rulepack lint
         language: system
         pass_filenames: false

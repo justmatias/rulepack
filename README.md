@@ -41,13 +41,13 @@ uvx --from git+https://github.com/justmatias/rulepack@v0.7.0 rulepack --version
 Scaffold the layout in a repo, then lint it:
 
 ```bash
-rulepack init --pre-commit --ci github --makefile   # shows the plan and asks first
+rulepack init --pre-commit --ci github --poe   # shows the plan and asks first
 rulepack lint
 ```
 
 | Command | What it does |
 | --- | --- |
-| `rulepack init` | Writes `.rulepack.toml`, and with `--checks-dir DIR` an ast-grep sgconfig with empty `rules/` and `rule-tests/` for the repo's own checks. `--pre-commit`, `--ci github` and `--makefile` add the hooks, the workflow and the Make targets. It shows the plan, asks first (`--yes` skips, `--dry-run` writes nothing) and never overwrites a file, so a second run changes nothing. |
+| `rulepack init` | Writes `.rulepack.toml`, and with `--checks-dir DIR` an ast-grep sgconfig with empty `rules/` and `rule-tests/` for the repo's own checks. `--pre-commit`, `--ci github` and `--poe` add the hooks, the workflow and the poe tasks (in `pyproject.toml`, or `poe_tasks.toml` when there is none). It shows the plan, asks first (`--yes` skips, `--dry-run` writes nothing) and never overwrites a file, so a second run changes nothing. |
 | `rulepack lint` | Runs the checks below. |
 | `rulepack config` | Prints the resolved config and where each value comes from (`--json` for JSON). |
 | `rulepack hook post-edit`, `rulepack hook stop` | Agent hooks (below). |
