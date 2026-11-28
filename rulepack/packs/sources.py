@@ -132,8 +132,14 @@ def write_lock(path: Path, lock: Lock) -> None:
     text = render_lock(lock)
     if path.is_file() and path.read_text(encoding="utf-8") == text:
         return
+    # newline="\n": the same lock on every OS, not CRLF on Windows.
     with tempfile.NamedTemporaryFile(
-        "w", dir=path.parent, delete=False, encoding="utf-8", suffix=".tmp"
+        "w",
+        dir=path.parent,
+        delete=False,
+        encoding="utf-8",
+        newline="\n",
+        suffix=".tmp",
     ) as pending:
         pending.write(text)
     Path(pending.name).replace(path)
