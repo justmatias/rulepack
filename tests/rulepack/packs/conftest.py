@@ -1,3 +1,4 @@
+import json
 import shutil
 from pathlib import Path
 
@@ -5,7 +6,7 @@ import pytest
 
 from rulepack.packs.fetch import retry_after_making_writable
 from tests.rulepack.helpers import init_git_repository, run_git
-from tests.rulepack.packs.helpers import publish_source, write_source
+from tests.rulepack.packs.helpers import publish_source, write_consumer, write_source
 
 
 @pytest.fixture(autouse=True)
@@ -32,12 +33,9 @@ def source_url(tmp_path: Path, source_work: Path) -> str:
 
 @pytest.fixture
 def consumer(tmp_path: Path, source_url: str) -> Path:
-    """A git repo whose config declares the `team` git source at main."""
+    """A git repo with a bare except, selecting team/python-core from a git source."""
     repository = tmp_path / "consumer"
-    repository.mkdir()
-    (repository / ".rulepack.toml").write_text(
-        f'[sources.team]\ngit = "{source_url}"\nref = "main"\n', encoding="utf-8"
-    )
+    write_consumer(repository, f'git = "{source_url}"\nref = "main"\n')
     return init_git_repository(repository)
 
 
@@ -73,12 +71,9 @@ def _push_new_source_commit(
 
 @pytest.fixture
 def path_consumer(tmp_path: Path, source_work: Path) -> Path:
-    """A folder whose config declares the source folder as the `team` path source."""
+    """A folder, not a git repo, selecting team/python-core from a path source."""
     repository = tmp_path / "local"
-    repository.mkdir()
-    (repository / ".rulepack.toml").write_text(
-        f'[sources.team]\npath = "{source_work.as_posix()}"\n', encoding="utf-8"
-    )
+    write_consumer(repository, f'path = "{source_work.as_posix()}"\n')
     return repository
 
 
@@ -98,3 +93,75 @@ def _rewrite_source_history(
     run_git(source_work, "push", "--quiet", "--force", "origin", "rewritten:main")
     # Otherwise a clone gets the old pack whole, unreachable commit included.
     run_git(tmp_path / "source.git", "config", "pack.allowPackReuse", "false")
+
+
+@pytest.fixture
+def scan(run_rulepack):
+    def run(repository: Path, *arguments: str) -> tuple[int, dict]:
+        completed = run_rulepack(
+            "lint", "--only", "scan", "--json", *arguments, working_directory=repository
+        )
+        return completed.returncode, json.loads(completed.stdout or "{}")
+
+    return run
+
+
+@pytest.fixture
+def append_config(locked_consumer: Path):
+    def append(text: str) -> None:
+        config = locked_consumer / ".rulepack.toml"
+        config.write_text(config.read_text(encoding="utf-8") + text, encoding="utf-8")
+
+    return append
+
+
+@pytest.fixture
+def _write_local_check_with_pack_id(locked_consumer: Path) -> None:
+    """The repo's own no-bare-except, which never matches."""
+    checks = locked_consumer / "lint"
+    (checks / "rules").mkdir(parents=True)
+    (checks / "sgconfig.yml").write_text("ruleDirs: [rules]\n", encoding="utf-8")
+    (checks / "rules" / "local.yml").write_text(
+        "id: no-bare-except\nlanguage: Python\nseverity: error\n"
+        "message: Local rule\nrule: {pattern: never_called()}\n",
+        encoding="utf-8",
+    )
+
+
+@pytest.fixture(
+    params=[
+        lambda text: text.replace("id: no-bare-except\n", ""),
+        lambda text: text + "---\n{}\n",
+    ],
+    ids=["missing-id", "empty-rule"],
+)
+def _write_pack_rule_without_id(
+    request: pytest.FixtureRequest, source_work: Path
+) -> None:
+    check = source_work / "lint" / "rules" / "no-bare-except.yml"
+    check.write_text(request.param(check.read_text()), encoding="utf-8")
+
+
+@pytest.fixture
+def _break_pack_rule_tests(source_work: Path) -> None:
+    test = source_work / "lint" / "rule-tests" / "no-bare-except-test.yml"
+    test.write_text("id: [unclosed\n", encoding="utf-8")
+
+
+@pytest.fixture
+def _write_pack_rule_test_as_a_list(source_work: Path) -> None:
+    test = source_work / "lint" / "rule-tests" / "no-bare-except-test.yml"
+    test.write_text("- id: no-bare-except\n", encoding="utf-8")
+
+
+@pytest.fixture(params=["on", "0123", "false"])
+def plain_scalar_check_id(request: pytest.FixtureRequest, source_work: Path) -> str:
+    check_id = request.param
+    check = source_work / "lint" / "rules" / "no-bare-except.yml"
+    check.write_text(
+        check.read_text(encoding="utf-8").replace(
+            "id: no-bare-except", f"id: {check_id}"
+        ),
+        encoding="utf-8",
+    )
+    return check_id

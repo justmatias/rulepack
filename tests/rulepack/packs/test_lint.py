@@ -1,0 +1,289 @@
+import json
+import shutil
+from pathlib import Path
+
+import pytest
+
+from rulepack.packs import fetch
+from tests.rulepack.packs.helpers import publish_source, write_source
+
+
+def test_lint_fails_when_a_git_pack_check_finds_a_violation(locked_consumer, scan):
+    exit_code, report = scan(locked_consumer)
+
+    assert exit_code == 1
+    assert [finding["rule"] for finding in report["scan"]["findings"]] == [
+        "no-bare-except"
+    ]
+
+
+def test_lint_passes_when_the_pack_check_is_disabled(
+    locked_consumer, append_config, scan
+):
+    append_config('\n[pack_overrides]\ndisable = ["no-bare-except"]\n')
+
+    exit_code, report = scan(locked_consumer)
+
+    assert (exit_code, report["scan"]["findings"]) == (0, [])
+
+
+def test_lint_applies_the_severity_override_when_one_is_set(
+    locked_consumer, append_config, scan
+):
+    append_config('\n[pack_overrides]\nseverity = { no-bare-except = "warning" }\n')
+
+    exit_code, report = scan(locked_consumer)
+
+    assert exit_code == 0
+    assert [finding["severity"] for finding in report["scan"]["findings"]] == [
+        "warning"
+    ]
+
+
+def test_lint_fails_when_an_override_names_an_unknown_check(
+    locked_consumer, append_config, run_rulepack
+):
+    append_config('\n[pack_overrides]\ndisable = ["no-such-check"]\n')
+
+    completed = run_rulepack(
+        "lint", "--only", "scan", working_directory=locked_consumer
+    )
+
+    assert completed.returncode == 2
+    assert "unknown checks: no-such-check" in completed.stderr
+
+
+def test_lint_runs_the_pack_rule_tests_when_a_pack_is_selected(
+    locked_consumer, run_rulepack
+):
+    completed = run_rulepack(
+        "lint", "--only", "test", "--json", working_directory=locked_consumer
+    )
+
+    assert completed.returncode == 0, completed.stderr
+    assert json.loads(completed.stdout)["test"] == {
+        "ok": True,
+        "skipped": None,
+        "findings": [],
+    }
+
+
+def test_lint_scans_with_a_path_source_when_the_folder_is_not_a_git_repo(
+    path_consumer: Path, scan
+):
+    exit_code, report = scan(path_consumer)
+
+    assert exit_code == 1
+    assert report["scan"]["findings"][0]["rule"] == "no-bare-except"
+    assert not (path_consumer / "rulepack.lock").exists()
+
+
+def test_lint_fails_with_the_lock_message_when_the_lock_is_missing(
+    consumer: Path, run_rulepack
+):
+    completed = run_rulepack("lint", "--only", "scan", working_directory=consumer)
+
+    assert completed.returncode == 2
+    assert "run `rulepack packs lock`" in completed.stderr
+    assert not (consumer / "rulepack.lock").exists()
+
+
+def test_lint_fails_with_the_lock_message_when_the_ref_changed(
+    locked_consumer: Path, lock_text: str, run_rulepack
+):
+    config = locked_consumer / ".rulepack.toml"
+    config.write_text(config.read_text().replace('ref = "main"', 'ref = "other"'))
+
+    completed = run_rulepack(
+        "lint", "--only", "scan", working_directory=locked_consumer
+    )
+
+    assert completed.returncode == 2
+    assert "run `rulepack packs lock`" in completed.stderr
+    assert (locked_consumer / "rulepack.lock").read_text() == lock_text
+
+
+def test_lint_fails_when_a_selected_pack_is_not_in_the_source(
+    locked_consumer: Path, run_rulepack
+):
+    config = locked_consumer / ".rulepack.toml"
+    config.write_text(config.read_text().replace("team/python-core", "team/missing"))
+
+    completed = run_rulepack(
+        "lint", "--only", "scan", working_directory=locked_consumer
+    )
+
+    assert completed.returncode == 2
+    assert "source 'team' has no pack 'missing'" in completed.stderr
+
+
+def test_lint_names_both_packs_when_two_packs_define_the_same_check(
+    tmp_path: Path, path_consumer: Path, run_rulepack
+):
+    write_source(tmp_path / "other", {"errors": ["no-bare-except"]})
+    config = path_consumer / ".rulepack.toml"
+    config.write_text(
+        config.read_text().replace(
+            '"team/python-core"', '"team/python-core", "other/errors"'
+        )
+        + '\n[sources.other]\npath = "../other"\n'
+    )
+
+    completed = run_rulepack("lint", "--only", "scan", working_directory=path_consumer)
+
+    assert completed.returncode == 2
+    assert "'team/python-core'" in completed.stderr
+    assert "'other/errors'" in completed.stderr
+
+
+@pytest.mark.usefixtures("_write_local_check_with_pack_id")
+def test_lint_uses_the_repo_check_when_it_has_a_pack_check_id(
+    locked_consumer: Path, run_rulepack
+):
+    completed = run_rulepack(
+        "lint", "--only", "scan", working_directory=locked_consumer
+    )
+
+    assert completed.returncode == 0, completed.stderr
+    assert "the repo's check no-bare-except replaces the pack check" in (
+        completed.stderr
+    )
+
+
+def test_lint_fetches_the_locked_commits_when_the_cache_is_cold(
+    tmp_path: Path, locked_consumer: Path, cache_directory: Path, run_rulepack, scan
+):
+    second = tmp_path / "second"
+    write_source(second, {"errors": ["no-swallowed-exception"]})
+    url = publish_source(second, tmp_path / "second.git")
+    config = locked_consumer / ".rulepack.toml"
+    config.write_text(
+        config.read_text().replace(
+            '"team/python-core"', '"team/python-core", "second/errors"'
+        )
+        + f'\n[sources.second]\ngit = "{url}"\nref = "main"\n'
+    )
+    assert (
+        run_rulepack("packs", "lock", working_directory=locked_consumer).returncode == 0
+    )
+    shutil.rmtree(cache_directory, onexc=fetch.retry_after_making_writable)
+
+    exit_code, report = scan(locked_consumer)
+
+    assert exit_code == 1
+    assert {finding["rule"] for finding in report["scan"]["findings"]} == {
+        "no-bare-except"
+    }
+    assert len(list(cache_directory.iterdir())) == 2
+
+
+def test_lint_scans_changed_files_with_pack_checks_when_asked_for_changes(
+    locked_consumer: Path, scan
+):
+    (locked_consumer / "added.py").write_text(
+        (locked_consumer / "target.py").read_text()
+    )
+
+    exit_code, report = scan(locked_consumer, "--changed", "--base-ref", "HEAD")
+
+    assert exit_code == 1
+    assert {finding["file"] for finding in report["scan"]["findings"]} == {"added.py"}
+
+
+def test_lint_fails_when_the_configured_sgconfig_is_missing_and_packs_are_selected(
+    locked_consumer: Path, run_rulepack
+):
+    config = locked_consumer / ".rulepack.toml"
+    config.write_text('sgconfig = "checks/sgconfig.yml"\n' + config.read_text())
+
+    completed = run_rulepack(
+        "lint", "--only", "scan", working_directory=locked_consumer
+    )
+
+    assert completed.returncode == 2
+    assert "no ast-grep config at" in completed.stderr
+
+
+@pytest.mark.usefixtures("_write_pack_rule_without_id")
+def test_lint_names_the_file_when_a_pack_rule_has_no_id(
+    path_consumer: Path, run_rulepack
+):
+    completed = run_rulepack("lint", "--only", "scan", working_directory=path_consumer)
+
+    assert completed.returncode == 2
+    assert "no-bare-except.yml has a rule with no id" in completed.stderr
+
+
+@pytest.mark.usefixtures("_break_pack_rule_tests")
+def test_lint_scans_when_the_pack_rule_tests_are_broken(path_consumer: Path, scan):
+    exit_code, report = scan(path_consumer)
+
+    assert exit_code == 1
+    assert report["scan"]["findings"][0]["rule"] == "no-bare-except"
+
+
+@pytest.mark.usefixtures("_write_pack_rule_test_as_a_list")
+def test_lint_names_the_file_when_a_pack_rule_test_is_not_a_mapping(
+    path_consumer: Path, run_rulepack
+):
+    completed = run_rulepack("lint", "--only", "test", working_directory=path_consumer)
+
+    assert completed.returncode == 2
+    assert "no-bare-except-test.yml: every rule test must be a mapping" in (
+        completed.stderr
+    )
+
+
+def test_lint_names_the_file_when_a_pack_rule_test_id_is_a_list(
+    path_consumer: Path, source_work: Path, run_rulepack
+):
+    test = source_work / "lint" / "rule-tests" / "no-bare-except-test.yml"
+    test.write_text("id: [no-bare-except]\n", encoding="utf-8")
+
+    completed = run_rulepack("lint", "--only", "test", working_directory=path_consumer)
+
+    assert completed.returncode == 2
+    assert "no-bare-except-test.yml: every rule test needs a string id" in (
+        completed.stderr
+    )
+
+
+def test_lint_runs_pack_rule_tests_when_the_filename_differs_from_the_id(
+    path_consumer: Path, source_work: Path, run_rulepack
+):
+    tests = source_work / "lint" / "rule-tests"
+    (tests / "no-bare-except-test.yml").rename(tests / "bare-except-cases.yaml")
+
+    completed = run_rulepack(
+        "lint", "--only", "test", "--json", working_directory=path_consumer
+    )
+
+    assert completed.returncode == 0, completed.stderr
+    assert json.loads(completed.stdout)["test"]["skipped"] is None
+
+
+def test_lint_preserves_a_pack_check_id_when_it_is_a_plain_scalar(
+    path_consumer: Path, plain_scalar_check_id: str, scan
+):
+    exit_code, report = scan(path_consumer)
+
+    assert exit_code == 1
+    assert report["scan"]["findings"][0]["rule"] == plain_scalar_check_id
+
+
+def test_lint_runs_a_pack_check_when_only_a_hidden_local_check_matches_its_id(
+    path_consumer: Path, source_work: Path, scan
+):
+    lint_directory = path_consumer / "lint"
+    hidden = lint_directory / "rules" / ".hidden"
+    hidden.mkdir(parents=True)
+    (lint_directory / "sgconfig.yml").write_text(
+        "ruleDirs: [rules]\n", encoding="utf-8"
+    )
+    check = source_work / "lint" / "rules" / "no-bare-except.yml"
+    (hidden / check.name).write_bytes(check.read_bytes())
+
+    exit_code, report = scan(path_consumer)
+
+    assert exit_code == 1
+    assert report["scan"]["findings"][0]["rule"] == "no-bare-except"

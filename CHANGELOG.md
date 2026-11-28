@@ -2,6 +2,44 @@
 
 <!-- version list -->
 
+## v0.10.0 (2026-11-28)
+
+### Bug Fixes
+
+- **lint**: Discover pack rule tests by ID
+  ([`1fb8cae`](https://github.com/justmatias/rulepack/commit/1fb8cae8433a7e49739d6b291b777fc13351cbf0))
+
+- **lint**: Name the file when a pack rule has no id
+  ([`046366b`](https://github.com/justmatias/rulepack/commit/046366b415e0716ab1b8804ddee21c7efa593a77))
+
+- **lint**: Name the file when a pack rule test is not a mapping
+  ([`6ff9bab`](https://github.com/justmatias/rulepack/commit/6ff9bab6048003cb5b54b353f5672f91e0512f68))
+
+- **lint**: Read the packs' rule tests only when the test step runs
+  ([`bf94def`](https://github.com/justmatias/rulepack/commit/bf94defd185a56c8520eb96e9d60e1f7b765453c))
+
+- **lint**: Reject an empty pack rule instead of skipping it
+  ([`0c76845`](https://github.com/justmatias/rulepack/commit/0c768452f97a93ddbfccdc406142b9c374dafbe4))
+
+### Features
+
+- **lint**: Run the selected packs' checks and rule tests
+  ([`b5c8585`](https://github.com/justmatias/rulepack/commit/b5c85855d98f64db8aec091a46d231d221312c90))
+
+### Refactoring
+
+- **packs**: Use the source resolver directly
+  ([`aed36b3`](https://github.com/justmatias/rulepack/commit/aed36b33216828dee3a95f6419869cf838f5537f))
+
+### Testing
+
+- **lint**: Check the error names the broken rule test file
+  ([`19cf280`](https://github.com/justmatias/rulepack/commit/19cf2802349ab5807a1f4dad0b607ce4b8087858))
+
+- **lint**: Use the shared CLI fixture for pack tests
+  ([`d22f380`](https://github.com/justmatias/rulepack/commit/d22f3802af2c66f96f2ba645fcc384caec645e70))
+
+
 ## v0.9.0 (2026-11-28)
 
 ### Bug Fixes

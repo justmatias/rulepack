@@ -1,4 +1,5 @@
 import argparse
+import contextlib
 import fnmatch
 import json
 import logging
@@ -16,6 +17,8 @@ from pydantic import Field
 
 from rulepack.config import ConfigError, ResolvedConfig, StrictModel, resolve_config
 from rulepack.lint.changed_files import ChangedFilesError, list_changed_files
+from rulepack.lint.merged_sgconfig import write_merged_sgconfig
+from rulepack.packs.sources import load_packs
 
 logger = logging.getLogger(__name__)
 
@@ -47,6 +50,8 @@ class LintRun(StrictModel):
     mode: Mode = "full"
     files: list[Path] = Field(default_factory=list)
     json_output: bool = False
+    # The temporary sgconfig that adds the selected packs' checks, when any are.
+    merged_sgconfig: Path | None = None
 
 
 def find_tool(name: str) -> str:
@@ -98,6 +103,8 @@ def find_sgconfig(run: LintRun) -> Path | None:
 
     Only the default path may be missing: a repo that sets `sgconfig` expects it.
     """
+    if run.merged_sgconfig is not None:
+        return run.merged_sgconfig
     path = run.config.values.sgconfig
     if path.is_file():
         return path
@@ -355,7 +362,19 @@ def main(argv: list[str] | None = None) -> int:
     try:
         run = build_run(arguments)
         steps = select_steps(arguments.only, arguments.skip)
-        results = {name: run_step(name, run) for name in steps}
+        packs = load_packs(run.config) if {"test", "scan"} & set(steps) else []
+        with contextlib.ExitStack() as stack:
+            if packs:
+                merged = stack.enter_context(
+                    write_merged_sgconfig(
+                        run.config,
+                        packs,
+                        local_sgconfig=find_sgconfig(run),
+                        include_tests="test" in steps,
+                    )
+                )
+                run = run.model_copy(update={"merged_sgconfig": merged})
+            results = {name: run_step(name, run) for name in steps}
     except (LintError, ConfigError, ChangedFilesError, yaml.YAMLError) as error:
         logger.error("rulepack lint: %s", error)
         return 2
