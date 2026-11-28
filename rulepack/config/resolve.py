@@ -12,6 +12,9 @@ PATH_KEYS = {
     "sgconfig",
     "importlinter",
 }
+# Tables kept whole: their keys are names the user chose, not config keys.
+OPAQUE_KEYS = {"sources"}
+LOCK_FILE_NAME = "rulepack.lock"
 
 
 class ConfigError(Exception):
@@ -28,7 +31,7 @@ def read_toml(path: Path) -> dict[str, Any]:
 def flatten(data: dict[str, Any], prefix: str = "") -> dict[str, Any]:
     flat: dict[str, Any] = {}
     for key, value in data.items():
-        if isinstance(value, dict):
+        if isinstance(value, dict) and f"{prefix}{key}" not in OPAQUE_KEYS:
             flat.update(flatten(value, f"{prefix}{key}."))
         else:
             flat[f"{prefix}{key}"] = value
@@ -51,6 +54,17 @@ def absolute(value: Any, base: Path) -> Any:
         return [absolute(item, base) for item in value]
     path = Path(value).expanduser()
     return path if path.is_absolute() else base / path
+
+
+def make_source_paths_absolute(
+    sources: dict[str, dict[str, Any]], base: Path
+) -> dict[str, dict[str, Any]]:
+    return {
+        name: {**entry, "path": absolute(entry["path"], base)}
+        if entry.get("path") is not None
+        else entry
+        for name, entry in sources.items()
+    }
 
 
 def validate(data: dict[str, Any], origin: str) -> ProjectConfig:
@@ -79,6 +93,10 @@ def resolve_config(
     file_values = flatten(
         validate(file_data, str(config_file)).model_dump(exclude_unset=True)
     )
+    if "sources" in file_values:
+        file_values["sources"] = make_source_paths_absolute(
+            file_values["sources"], root
+        )
     merged = flatten(ProjectConfig().model_dump())
     sources: dict[str, Source] = dict.fromkeys(merged, "default")
     merged.update(file_values)
@@ -98,6 +116,7 @@ def resolve_config(
         root=root,
         git_root=git_root,
         file=config_file,
+        lock_file=root / LOCK_FILE_NAME,
         values=validate(unflatten(merged), "resolved config"),
         sources=sources,
     )

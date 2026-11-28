@@ -12,6 +12,8 @@ from rulepack.config.settings import ResolvedConfig
 def display_value(value: Any, root: Path) -> Any:
     if isinstance(value, list):
         return [display_value(item, root) for item in value]
+    if isinstance(value, dict):
+        return {key: display_value(item, root) for key, item in value.items()}
     if isinstance(value, Path):
         return (
             value.relative_to(root).as_posix()
