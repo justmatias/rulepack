@@ -59,7 +59,11 @@ def collect_pack_checks(packs: list[Pack]) -> dict[str, PackCheck]:
             for document in yaml.safe_load_all(path.read_text(encoding="utf-8")):
                 if not document:
                     continue
-                check_id = document["id"]
+                check_id = document.get("id") if isinstance(document, dict) else None
+                if not isinstance(check_id, str) or not check_id:
+                    raise ConfigError(
+                        f"pack {qualified!r}: {path} has a rule with no id"
+                    )
                 if check_id in checks:
                     raise ConfigError(
                         f"check {check_id!r} is in pack {checks[check_id].pack!r} "
