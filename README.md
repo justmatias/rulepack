@@ -30,6 +30,30 @@ Or run it without installing:
 uvx --from git+https://github.com/justmatias/rulepack@v0.8.0 rulepack --version
 ```
 
+## Pack sources
+
+A repo runs its own checks and the checks of the **packs** it selects from **sources**: git repos or local folders with a `packs.toml` at the root. No check ships inside rulepack.
+
+```toml
+# .rulepack.toml
+packs = ["mstack/python-core", "mstack/testing"]
+
+[sources.mstack]
+git = "https://github.com/justmatias/mstack"
+ref = "v7.4.0"
+
+[pack_overrides]
+disable = ["no-isort-off"]
+severity = { no-module-docstring = "warning" }
+```
+
+- `rulepack packs lock` pins every git source at a commit in `rulepack.lock`. Commit that file.
+- `rulepack packs update [SOURCE...]` moves the pins to what the refs point at now.
+- `rulepack packs list [--json]` shows each source's packs and checks.
+- `rulepack init --source NAME=URL@REF` writes a source and its lock in a new repo.
+
+`rulepack lint` runs the selected packs' checks and rule tests next to the repo's own. A repo check with a pack check's id replaces it, and one id in two selected packs is an error. A path source (`path = "../team-checks"`) needs no lock.
+
 ## Development
 
 ```bash

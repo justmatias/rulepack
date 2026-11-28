@@ -1,0 +1,11 @@
+# rulepack lints itself with the packs it ships for others: mstack's checks,
+# pinned in rulepack.lock. Run `rulepack packs update` to move the pin.
+packs = ["mstack/python-core", "mstack/testing"]
+
+[sources.mstack]
+git = "https://github.com/justmatias/mstack"
+ref = "v7.4.0"
+
+[scan]
+# tests/fixtures/ breaks the checks on purpose.
+exclude = ["tests/fixtures/**"]
