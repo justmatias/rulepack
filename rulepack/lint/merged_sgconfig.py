@@ -57,7 +57,7 @@ def collect_pack_checks(packs: list[Pack]) -> dict[str, PackCheck]:
         qualified = f"{pack.source}/{pack.name}"
         for path in pack.checks:
             for document in yaml.safe_load_all(path.read_text(encoding="utf-8")):
-                if not document:
+                if document is None:
                     continue
                 check_id = document.get("id") if isinstance(document, dict) else None
                 if not isinstance(check_id, str) or not check_id:
