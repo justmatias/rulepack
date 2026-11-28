@@ -40,8 +40,16 @@ class PackSource(StrictModel):
         return self
 
 
+class PackOverrides(StrictModel):
+    disable: list[str] = []
+    severity: dict[str, Literal["error", "warning", "info", "hint"]] = {}
+
+
 class ProjectConfig(StrictModel):
+    # `<source>/<pack>` names, from `sources`.
+    packs: list[str] = []
     sources: dict[str, PackSource] = {}
+    pack_overrides: PackOverrides = PackOverrides()
     sgconfig: Path = Path("lint/sgconfig.yml")
     importlinter: Path = Path(".importlinter")
     scan: ScanSettings = ScanSettings()

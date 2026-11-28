@@ -13,7 +13,7 @@ PATH_KEYS = {
     "importlinter",
 }
 # Tables kept whole: their keys are names the user chose, not config keys.
-OPAQUE_KEYS = {"sources"}
+OPAQUE_KEYS = {"sources", "pack_overrides.severity"}
 LOCK_FILE_NAME = "rulepack.lock"
 
 
