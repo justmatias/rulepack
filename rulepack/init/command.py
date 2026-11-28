@@ -4,6 +4,7 @@ import importlib.resources
 import logging
 import re
 import sys
+import tomllib
 from pathlib import Path
 from typing import Literal
 
@@ -20,7 +21,9 @@ RULEPACK_REPOSITORY = "https://github.com/justmatias/rulepack"
 PRE_COMMIT_CONFIG = ".pre-commit-config.yaml"
 WORKFLOW = Path(".github/workflows/rulepack.yml")
 DEFAULT_CHECKS_DIR = "lint"
-MAKEFILE_TARGET = re.compile(r"^(?P<target>[A-Za-z0-9_.-]+)\s*:(?!=)", re.MULTILINE)
+PYPROJECT = "pyproject.toml"
+POE_TASKS_FILE = "poe_tasks.toml"
+POE_TASK_HEADER = re.compile(r"^\[[^\]]*\.(?P<task>[A-Za-z0-9_-]+)\]$", re.MULTILINE)
 TOP_LEVEL_KEY = re.compile(r"^[^\s#-][^:]*:")
 LIST_ITEM = re.compile(r"^(?P<indent>\s*)-\s")
 
@@ -34,6 +37,12 @@ class PlannedFile(StrictModel):
     action: Action
     # The file's full content after the change; empty when skipped.
     content: str = ""
+
+
+class PoeTasksTarget(StrictModel):
+    path: Path
+    # The dotted table the tasks live under in that file.
+    table: str
 
 
 class ReposInsertionPoint(StrictModel):
@@ -149,33 +158,53 @@ def plan_workflow(root: Path, version: str) -> PlannedFile:
     )
 
 
-def split_makefile_blocks() -> dict[str, str]:
-    """The snippet's blocks (separated by blank lines), by the target they define."""
-    blocks = render_template("Makefile.snippet").strip().split("\n\n")
+def choose_poe_tasks_target(root: Path) -> PoeTasksTarget:
+    """pyproject.toml when the repo has one; otherwise poe's own poe_tasks.toml."""
+    pyproject = root / PYPROJECT
+    if pyproject.is_file():
+        return PoeTasksTarget(path=pyproject, table="tool.poe.tasks")
+    return PoeTasksTarget(path=root / POE_TASKS_FILE, table="tasks")
+
+
+def read_poe_task_names(text: str, target: PoeTasksTarget) -> set[str]:
+    try:
+        table = tomllib.loads(text)
+    except tomllib.TOMLDecodeError as error:
+        raise InitError(f"{target.path.name} is not valid TOML: {error}") from error
+    for key in target.table.split("."):
+        table = table.get(key) or {}
+    return set(table)
+
+
+def split_poe_task_blocks(table: str) -> dict[str, str]:
+    """The template's blocks (separated by blank lines), by the task they define."""
+    blocks = render_template("poe-tasks.toml", table=table).strip().split("\n\n")
     return {
-        match["target"]: block
+        match["task"]: block
         for block in blocks
-        if (match := MAKEFILE_TARGET.search(block.replace(".PHONY:", "")))
+        if (match := POE_TASK_HEADER.search(block))
     }
 
 
-def plan_makefile(root: Path) -> PlannedFile:
-    path = root / "Makefile"
+def plan_poe_tasks(root: Path) -> PlannedFile:
+    target = choose_poe_tasks_target(root)
+    path = target.path
     text = path.read_text(encoding="utf-8") if path.is_file() else ""
-    defined = {match["target"] for match in MAKEFILE_TARGET.finditer(text)}
-    missing = [
-        block
-        for target, block in split_makefile_blocks().items()
-        if target not in defined
-    ]
+    defined = read_poe_task_names(text, target)
+    blocks = split_poe_task_blocks(target.table)
+    missing = [block for task, block in blocks.items() if task not in defined]
     if not missing:
         return PlannedFile(path=path, action="exists, skipped")
     separator = "\n" if text and not text.endswith("\n") else ""
     prefix = f"{text}{separator}\n" if text else ""
+    updated = prefix + "\n\n".join(missing) + "\n"
+    # Appended tables clash with tasks the file defines inline (`tasks = {...}`).
+    try:
+        tomllib.loads(updated)
+    except tomllib.TOMLDecodeError as error:
+        raise InitError(f"could not add the poe tasks to {path.name}") from error
     return PlannedFile(
-        path=path,
-        action="append" if text else "create",
-        content=prefix + "\n\n".join(missing) + "\n",
+        path=path, action="append" if text else "create", content=updated
     )
 
 
@@ -199,8 +228,8 @@ def build_plan(root: Path, arguments: argparse.Namespace) -> list[PlannedFile]:
         plan.append(plan_pre_commit(root, version))
     if arguments.ci == "github":
         plan.append(plan_workflow(root, version))
-    if arguments.makefile:
-        plan.append(plan_makefile(root))
+    if arguments.poe:
+        plan.append(plan_poe_tasks(root))
     return plan
 
 
@@ -274,9 +303,12 @@ def parse_arguments(argv: list[str] | None) -> argparse.Namespace:
         help=f"Write {WORKFLOW.as_posix()}, which runs the rulepack action.",
     )
     parser.add_argument(
-        "--makefile",
+        "--poe",
         action="store_true",
-        help="Add lint-rules and lint-rules-changed targets to the Makefile.",
+        help=(
+            f"Add lint-rules and lint-rules-changed poe tasks to {PYPROJECT}, "
+            f"or to {POE_TASKS_FILE} when the repo has no {PYPROJECT}."
+        ),
     )
     parser.add_argument(
         "--dry-run", action="store_true", help="Print the plan and write nothing."
@@ -292,8 +324,8 @@ def main(argv: list[str] | None = None) -> int:
 
     It shows every file it would write and waits for confirmation. It never overwrites
     a file: it creates missing ones, and appends to `.pre-commit-config.yaml` and the
-    `Makefile` only when the rulepack entries are not there yet, so a second run changes
-    nothing.
+    poe tasks file only when the rulepack entries are not there yet, so a second run
+    changes nothing.
     """
     arguments = parse_arguments(argv)
     current_directory = Path.cwd().resolve()

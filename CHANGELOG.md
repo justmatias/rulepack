@@ -2,6 +2,43 @@
 
 <!-- version list -->
 
+## v0.8.0 (2026-11-28)
+
+### Build System
+
+- Replace the Makefile with poethepoet tasks ([#35](https://github.com/justmatias/rulepack/pull/35),
+  [`8add303`](https://github.com/justmatias/rulepack/commit/8add3032b9cc612d17282c3fcdc7397314da17df))
+
+### Chores
+
+- **ci**: Prepare rulepack releases for PyPI ([#27](https://github.com/justmatias/rulepack/pull/27),
+  [`a2089cd`](https://github.com/justmatias/rulepack/commit/a2089cd3197a8dbdc3a8c1a60c85f3ee666b4dd0))
+
+### Documentation
+
+- Describe the commands that work today ([#34](https://github.com/justmatias/rulepack/pull/34),
+  [`583c2b2`](https://github.com/justmatias/rulepack/commit/583c2b2b786b4ea663756949ec40a53124b97408))
+
+- Document installing rulepack from PyPI ([#28](https://github.com/justmatias/rulepack/pull/28),
+  [`de0da11`](https://github.com/justmatias/rulepack/commit/de0da111b095fa52ed8f675e3ecee2ad36f93008))
+
+- Document rulepack's commands and remove the migration spec
+  ([#7](https://github.com/justmatias/rulepack/pull/7),
+  [`f4aaca9`](https://github.com/justmatias/rulepack/commit/f4aaca93924c95f807c57156bbff1236f1d44b85))
+
+- Explain why rulepack exists ([#34](https://github.com/justmatias/rulepack/pull/34),
+  [`583c2b2`](https://github.com/justmatias/rulepack/commit/583c2b2b786b4ea663756949ec40a53124b97408))
+
+### Features
+
+- **init**: Write poe tasks instead of Make targets
+  ([`314b14a`](https://github.com/justmatias/rulepack/commit/314b14a1622d14620fcd3264e766f01fd4194255))
+
+### Breaking Changes
+
+- **init**: `rulepack init --makefile` is gone; use `--poe`.
+
+
 ## v0.7.0 (2026-11-28)
 
 ### Features

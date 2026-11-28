@@ -1,3 +1,5 @@
+import tomllib
+
 import yaml
 
 from tests.rulepack.init.helpers import read_tree
@@ -48,10 +50,10 @@ def test_init_writes_checks_folder_to_config_when_it_is_given(run_init, git_repo
 
 
 def test_init_changes_nothing_when_run_twice(run_init, git_repository):
-    run_init("--yes", "--pre-commit", "--ci", "github", "--makefile")
+    run_init("--yes", "--pre-commit", "--ci", "github", "--poe")
     before = read_tree(git_repository)
 
-    completed = run_init("--yes", "--pre-commit", "--ci", "github", "--makefile")
+    completed = run_init("--yes", "--pre-commit", "--ci", "github", "--poe")
 
     assert read_tree(git_repository) == before
     assert "nothing to write" in completed.stderr
@@ -80,15 +82,41 @@ def test_init_creates_pre_commit_config_when_it_is_missing(run_init, git_reposit
     assert config["repos"][0]["hooks"][0]["id"] == "rulepack-lint"
 
 
-def test_init_skips_makefile_target_when_it_exists(run_init, git_repository):
-    (git_repository / "Makefile").write_text("lint-rules:\n\techo mine\n")
+def test_init_skips_poe_task_when_pyproject_defines_it(run_init, git_repository):
+    user_pyproject = (
+        '[project]\nname = "app"\n\n[tool.poe.tasks]\nlint-rules = "echo mine"\n'
+    )
+    (git_repository / "pyproject.toml").write_text(user_pyproject)
 
-    run_init("--yes", "--makefile")
+    run_init("--yes", "--poe")
 
-    makefile = (git_repository / "Makefile").read_text()
-    assert makefile.startswith("lint-rules:\n\techo mine\n")
-    assert makefile.count("lint-rules:") == 1
-    assert "lint-rules-changed:\n\trulepack lint --changed" in makefile
+    text = (git_repository / "pyproject.toml").read_text()
+    tasks = tomllib.loads(text)["tool"]["poe"]["tasks"]
+    assert text.startswith(user_pyproject)
+    assert tasks["lint-rules"] == "echo mine"
+    assert tasks["lint-rules-changed"]["cmd"] == "rulepack lint --changed"
+    assert not (git_repository / "poe_tasks.toml").exists()
+
+
+def test_init_writes_poe_tasks_file_when_pyproject_is_missing(run_init, git_repository):
+    run_init("--yes", "--poe")
+
+    tasks = tomllib.loads((git_repository / "poe_tasks.toml").read_text())["tasks"]
+    assert tasks["lint-rules"]["cmd"] == "rulepack lint"
+    assert tasks["lint-rules-changed"]["cmd"] == "rulepack lint --changed"
+
+
+def test_init_reports_an_error_when_pyproject_defines_poe_tasks_inline(
+    run_init, git_repository
+):
+    user_pyproject = '[tool.poe]\ntasks = { test = "pytest" }\n'
+    (git_repository / "pyproject.toml").write_text(user_pyproject)
+
+    completed = run_init("--yes", "--poe")
+
+    assert completed.returncode == 2
+    assert "could not add the poe tasks to pyproject.toml" in completed.stderr
+    assert (git_repository / "pyproject.toml").read_text() == user_pyproject
 
 
 def test_init_pins_action_to_this_version_when_writing_workflow(
@@ -105,7 +133,7 @@ def test_init_pins_action_to_this_version_when_writing_workflow(
 
 
 def test_init_writes_nothing_when_dry_run_is_set(run_init, git_repository):
-    completed = run_init("--dry-run", "--pre-commit", "--makefile")
+    completed = run_init("--dry-run", "--pre-commit", "--poe")
 
     assert completed.returncode == 0
     assert read_tree(git_repository) == {}

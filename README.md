@@ -27,13 +27,13 @@ uvx rulepack --version
 Until the first PyPI release is available, install from the GitHub release tag:
 
 ```bash
-uv tool install git+https://github.com/justmatias/rulepack@v0.7.0
+uv tool install git+https://github.com/justmatias/rulepack@v0.8.0
 ```
 
 Or run it without installing:
 
 ```bash
-uvx --from git+https://github.com/justmatias/rulepack@v0.7.0 rulepack --version
+uvx --from git+https://github.com/justmatias/rulepack@v0.8.0 rulepack --version
 ```
 
 ## Usage
@@ -41,13 +41,13 @@ uvx --from git+https://github.com/justmatias/rulepack@v0.7.0 rulepack --version
 Scaffold the layout in a repo, then lint it:
 
 ```bash
-rulepack init --pre-commit --ci github --makefile   # shows the plan and asks first
+rulepack init --pre-commit --ci github --poe   # shows the plan and asks first
 rulepack lint
 ```
 
 | Command | What it does |
 | --- | --- |
-| `rulepack init` | Writes `.rulepack.toml`, and with `--checks-dir DIR` an ast-grep sgconfig with empty `rules/` and `rule-tests/` for the repo's own checks. `--pre-commit`, `--ci github` and `--makefile` add the hooks, the workflow and the Make targets. It shows the plan, asks first (`--yes` skips, `--dry-run` writes nothing) and never overwrites a file, so a second run changes nothing. |
+| `rulepack init` | Writes `.rulepack.toml`, and with `--checks-dir DIR` an ast-grep sgconfig with empty `rules/` and `rule-tests/` for the repo's own checks. `--pre-commit`, `--ci github` and `--poe` add the hooks, the workflow and the poe tasks (in `pyproject.toml`, or `poe_tasks.toml` when there is none). It shows the plan, asks first (`--yes` skips, `--dry-run` writes nothing) and never overwrites a file, so a second run changes nothing. |
 | `rulepack lint` | Runs the checks below. |
 | `rulepack config` | Prints the resolved config and where each value comes from (`--json` for JSON). |
 | `rulepack hook post-edit`, `rulepack hook stop` | Agent hooks (below). |
@@ -112,7 +112,7 @@ steps:
   - uses: actions/checkout@v7
     with:
       fetch-depth: 0
-  - uses: justmatias/rulepack@v0.7.0
+  - uses: justmatias/rulepack@v0.8.0
 ```
 
 Inputs: `mode` (`full`, `changed` or `both`), `base-ref`, `rulepack-version`, `python-version` and `working-directory`. Every release moves the `v<major>` tag. On other CI providers, run `uvx --from git+https://github.com/justmatias/rulepack@<tag> rulepack lint`, and on merge requests the same with `--changed --base-ref origin/<base branch>`.

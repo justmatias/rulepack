@@ -1,0 +1,10 @@
+# Rules as checks (written by `rulepack init --poe`).
+[{{table}}.lint-rules]
+help = "Run every rulepack check on the whole repo"
+cmd = "rulepack lint"
+
+# Only the files changed against the base branch; warnings fail too.
+# Add --base-ref REF to change the base, or --staged to scan the staged files.
+[{{table}}.lint-rules-changed]
+help = "Run the rulepack checks on the files changed against the base branch"
+cmd = "rulepack lint --changed"
