@@ -2,6 +2,19 @@
 
 <!-- version list -->
 
+## v0.8.0 (2026-11-28)
+
+### Bug Fixes
+
+- **init**: Reject an .mstack.toml that still holds lint keys
+  ([`0b30c18`](https://github.com/justmatias/rulepack/commit/0b30c18ef31d645b664c94aae9d2f3a7773a95f3))
+
+### Features
+
+- **config**: Reject an .mstack.toml that still holds lint keys
+  ([`44e8f93`](https://github.com/justmatias/rulepack/commit/44e8f939d7d2f4d34f77491a112ddceff3da4ac2))
+
+
 ## v0.7.0 (2026-11-28)
 
 ### Features
