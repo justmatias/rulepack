@@ -156,3 +156,9 @@ def _write_pack_rule_without_id(
 def _break_pack_rule_tests(source_work: Path) -> None:
     test = source_work / "lint" / "rule-tests" / "no-bare-except-test.yml"
     test.write_text("id: [unclosed\n", encoding="utf-8")
+
+
+@pytest.fixture
+def _write_pack_rule_test_as_a_list(source_work: Path) -> None:
+    test = source_work / "lint" / "rule-tests" / "no-bare-except-test.yml"
+    test.write_text("- id: no-bare-except\n", encoding="utf-8")
