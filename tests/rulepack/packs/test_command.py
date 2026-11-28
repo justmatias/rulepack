@@ -1,6 +1,6 @@
 import json
-import tomllib
 import shutil
+import tomllib
 from pathlib import Path
 
 import pytest
@@ -149,7 +149,7 @@ def test_lock_writes_lf_line_endings_when_run_on_any_platform(locked_consumer: P
 
 @pytest.mark.usefixtures("_rewrite_source_history")
 def test_list_fetches_the_locked_commit_when_no_ref_points_at_it(
-    locked_consumer: Path, cache_directory: Path, source_url: str, run_in
+    locked_consumer: Path, cache_directory: Path, run_in
 ):
     locked = tomllib.loads((locked_consumer / "rulepack.lock").read_text())
     shutil.rmtree(cache_directory, onexc=fetch.retry_after_making_writable)
