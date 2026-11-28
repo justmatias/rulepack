@@ -24,6 +24,7 @@ repository = "https://github.com/justmatias/rulepack"
 
 [dependency-groups]
 dev = [
+    "poethepoet>=0.49.0",
     "pre-commit>=4",
     "pytest",
     "types-pyyaml",
@@ -43,6 +44,10 @@ include = [
     "/README.md",
     "/pyproject.toml",
 ]
+
+[tool.poe.tasks]
+lint = { cmd = "pre-commit run --all-files", help = "Every pre-commit hook on every file" }
+test = { cmd = "pytest -q", help = "pytest, skipping the slow tests" }
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

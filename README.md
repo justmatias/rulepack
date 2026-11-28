@@ -124,10 +124,10 @@ Inputs: `mode` (`full`, `changed` or `both`), `base-ref`, `rulepack-version`, `p
 ## Development
 
 ```bash
-make setup                  # dev dependencies
+uv sync                     # dev dependencies
 uv run pre-commit install   # installs the pre-commit and the commit-msg hooks
-make lint                   # every pre-commit hook on every file
-make test                   # pytest
+uv run poe lint             # every pre-commit hook on every file
+uv run poe test             # pytest
 ```
 
 Planned work lives in [`docs/specs/`](docs/specs/README.md).
