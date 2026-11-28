@@ -47,10 +47,6 @@ def resolve_source(name: str, source: PackSource, lock: Lock) -> ResolvedSource:
     )
 
 
-def resolve_source_root(name: str, source: PackSource, lock: Lock) -> Path:
-    return resolve_source(name, source, lock).root
-
-
 def lock_sources(
     config: ResolvedConfig, update: set[str], *, selected_only: bool = False
 ) -> Lock:
@@ -114,7 +110,7 @@ def load_packs(config: ResolvedConfig) -> list[Pack]:
     lock = read_lock(config.lock_file)
     packs: list[Pack] = []
     for source, names in by_source.items():
-        root = resolve_source_root(source, config.values.sources[source], lock)
-        manifest = load_manifest(root)
+        resolved = resolve_source(source, config.values.sources[source], lock)
+        manifest = load_manifest(resolved.root)
         packs.extend(build_pack(source, name, manifest) for name in names)
     return packs
