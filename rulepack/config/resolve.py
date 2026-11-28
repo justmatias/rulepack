@@ -5,13 +5,16 @@ from typing import Any
 from pydantic import ValidationError
 
 from rulepack.config.project_paths import find_config_path, find_git_root
-from rulepack.config.settings import ProjectConfig, ResolvedConfig, Source
+from rulepack.config.settings import PathSource, ProjectConfig, ResolvedConfig, Source
 
 # Keys whose values are paths (or lists of paths) relative to the config file.
 PATH_KEYS = {
     "sgconfig",
     "importlinter",
 }
+# Tables kept whole: their keys are names the user chose, not config keys.
+OPAQUE_KEYS = {"sources"}
+LOCK_FILE_NAME = "rulepack.lock"
 
 
 class ConfigError(Exception):
@@ -28,7 +31,7 @@ def read_toml(path: Path) -> dict[str, Any]:
 def flatten(data: dict[str, Any], prefix: str = "") -> dict[str, Any]:
     flat: dict[str, Any] = {}
     for key, value in data.items():
-        if isinstance(value, dict):
+        if isinstance(value, dict) and f"{prefix}{key}" not in OPAQUE_KEYS:
             flat.update(flatten(value, f"{prefix}{key}."))
         else:
             flat[f"{prefix}{key}"] = value
@@ -76,9 +79,13 @@ def resolve_config(
     file_data = read_toml(config_file) if config_file else {}
     root = config_file.parent if config_file else (git_root or start)
 
-    file_values = flatten(
-        validate(file_data, str(config_file)).model_dump(exclude_unset=True)
-    )
+    file_config = validate(file_data, str(config_file))
+    for name, source in file_config.sources.items():
+        if isinstance(source, PathSource):
+            file_config.sources[name] = source.model_copy(
+                update={"path": absolute(source.path, root)}
+            )
+    file_values = flatten(file_config.model_dump(exclude_unset=True))
     merged = flatten(ProjectConfig().model_dump())
     sources: dict[str, Source] = dict.fromkeys(merged, "default")
     merged.update(file_values)
@@ -98,6 +105,7 @@ def resolve_config(
         root=root,
         git_root=git_root,
         file=config_file,
+        lock_file=root / LOCK_FILE_NAME,
         values=validate(unflatten(merged), "resolved config"),
         sources=sources,
     )

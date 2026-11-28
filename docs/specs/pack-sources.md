@@ -55,7 +55,7 @@ A source has exactly one of `git` or `path`, and packs are always selected as `<
 - `rulepack packs update [<source>...]` re-resolves refs and rewrites the lock.
 - Path sources are not locked. `lint --changed` warns in CI when a selected pack comes from a path outside the repo.
 
-**Cache.** Sources live in `$XDG_CACHE_HOME/rulepack/sources/<sha256 of url>/<commit>/`. Each commit is extracted with `git archive` from a `--filter=blob:none` clone, into a temporary folder that is then renamed into place. An interrupted fetch never leaves a partial commit, and a rerun fetches only what is missing. git's own credentials cover private sources, and rulepack stores none.
+**Cache.** Sources live in `$XDG_CACHE_HOME/rulepack/sources/<first 16 hex characters of sha256(url)>/<commit>/`. The shorter source directory limits path lengths on Windows. Each commit is extracted with `git archive` from a `--filter=blob:none` clone, into a temporary folder that is then renamed into place. An interrupted fetch never leaves a partial commit, and a rerun fetches only what is missing. git's own credentials cover private sources, and rulepack stores none.
 
 **Agent hooks never fetch.** If a locked commit is not cached, `rulepack hook` skips pack checks for that run and logs one line saying to run `rulepack packs lock`, which also fetches. `rulepack lint` fetches when it needs to.
 

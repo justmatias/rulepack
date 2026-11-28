@@ -1,6 +1,6 @@
 [project]
 name = "rulepack"
-version = "0.8.0"
+version = "0.9.0"
 description = "Run ast-grep and import-linter checks from shared, versioned rule packs in any repo."
 readme = "README.md"
 license = { text = "MIT" }
@@ -14,6 +14,7 @@ dependencies = [
     "import-linter>=2.17",
     "pydantic>=2",
     "pyyaml>=6",
+    "tomli-w>=1",
 ]
 
 [project.scripts]

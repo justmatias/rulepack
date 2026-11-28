@@ -2,6 +2,50 @@
 
 <!-- version list -->
 
+## v0.9.0 (2026-11-28)
+
+### Bug Fixes
+
+- **packs**: List a commit only for a source that is still git
+  ([`35f7848`](https://github.com/justmatias/rulepack/commit/35f784805e90528c22fb081d5790772b6fafb06d))
+
+- **packs**: Validate pins and keep named updates scoped
+  ([`e1233cd`](https://github.com/justmatias/rulepack/commit/e1233cd124d72309596fa1c6b9813e4772e84692))
+
+- **packs**: Write the lock with a real TOML writer
+  ([`2ba6a9f`](https://github.com/justmatias/rulepack/commit/2ba6a9f4502bdbcbe30b25f5e99f6afedb6cd2d7))
+
+- **packs**: Write the lock with LF line endings on every OS
+  ([`9c06e88`](https://github.com/justmatias/rulepack/commit/9c06e88e73951602cb126bd7bf61ce51b0361070))
+
+### Features
+
+- **packs**: Lock, update and list pack sources
+  ([`0333222`](https://github.com/justmatias/rulepack/commit/03332221054371f110c54ef32b47a700cfc4fb0c))
+
+### Refactoring
+
+- **config**: Split pack sources into git and path models
+  ([`bc72750`](https://github.com/justmatias/rulepack/commit/bc7275049497c1ee5aa1b315b1ce77bb70a8d5ae))
+
+- **packs**: Keep each lock and fetch decision in one place
+  ([`7b0444a`](https://github.com/justmatias/rulepack/commit/7b0444a5acbe4462201d085a056914a23cf6e7a4))
+
+### Testing
+
+- Import the git helpers from their shared module
+  ([`21a2343`](https://github.com/justmatias/rulepack/commit/21a23430311478d19b171542a48a3c8def483119))
+
+- **packs**: Cover a lock whose ref no longer matches the config
+  ([`0c585a3`](https://github.com/justmatias/rulepack/commit/0c585a3c2efeb4aaa42cd6cfc315266024309b74))
+
+- **packs**: Cover a locked commit that no ref points at any more
+  ([`c8bebfb`](https://github.com/justmatias/rulepack/commit/c8bebfb22dd7a432dc5b6f5b938cf21612686f22))
+
+- **packs**: Drop an unused argument from the force-push test
+  ([`abb1ba4`](https://github.com/justmatias/rulepack/commit/abb1ba43313ab68be5eae9718269e2bc028b78cc))
+
+
 ## v0.8.0 (2026-11-28)
 
 ### Build System

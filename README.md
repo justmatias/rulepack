@@ -2,7 +2,7 @@
 
 Run ast-grep and import-linter checks from shared, versioned rule packs in any repo.
 
-**Status: no shared packs yet.** `rulepack` runs a repo's own checks: ast-grep rule tests and scans, and import-linter contracts, from the CLI, pre-commit, GitHub Actions and agent hooks. Loading packs from other repos is planned in [pack-sources](docs/specs/pack-sources.md). Repos that select mstack's bundled packs (`packs = [...]` in `.mstack.toml`) stay on mstack `v6.x` until then.
+**Status: shared source pinning is available.** Use `rulepack packs` to pin and inspect Git and local sources. Running their checks is the next step in [pack-sources](docs/specs/pack-sources.md). Repos that rely on mstack's bundled checks can keep using mstack `v6.x` in the meantime.
 
 ## Why
 
@@ -27,13 +27,13 @@ uvx rulepack --version
 Until the first PyPI release is available, install from the GitHub release tag:
 
 ```bash
-uv tool install git+https://github.com/justmatias/rulepack@v0.8.0
+uv tool install git+https://github.com/justmatias/rulepack@v0.9.0
 ```
 
 Or run it without installing:
 
 ```bash
-uvx --from git+https://github.com/justmatias/rulepack@v0.8.0 rulepack --version
+uvx --from git+https://github.com/justmatias/rulepack@v0.9.0 rulepack --version
 ```
 
 ## Usage
@@ -112,7 +112,7 @@ steps:
   - uses: actions/checkout@v7
     with:
       fetch-depth: 0
-  - uses: justmatias/rulepack@v0.8.0
+  - uses: justmatias/rulepack@v0.9.0
 ```
 
 Inputs: `mode` (`full`, `changed` or `both`), `base-ref`, `rulepack-version`, `python-version` and `working-directory`. Every release moves the `v<major>` tag. On other CI providers, run `uvx --from git+https://github.com/justmatias/rulepack@<tag> rulepack lint`, and on merge requests the same with `--changed --base-ref origin/<base branch>`.
@@ -120,6 +120,30 @@ Inputs: `mode` (`full`, `changed` or `both`), `base-ref`, `rulepack-version`, `p
 ### Agent hooks
 
 `rulepack hook post-edit` and `rulepack hook stop` read a Claude Code, Codex or Cursor hook payload on stdin. They run only in repos with `.rulepack.toml`. Post-edit scans the edited files; stop scans the changed files, and reports the same findings only once per session. A run that times out or fails logs a warning and lets the agent continue. Set `[hooks] enabled = false` to turn them off for a repo.
+
+## Pack sources
+
+Declare a Git repository or a local folder in `.rulepack.toml`. Each source
+contains a `packs.toml` manifest that lists its packs and checks.
+
+```toml
+[sources.mstack]
+git = "https://github.com/justmatias/mstack"
+ref = "v7.4.0"
+
+[sources.team]
+path = "../team-rules"
+```
+
+- Run `rulepack packs lock` to pin and fetch Git sources. Commit the generated
+  `rulepack.lock` alongside the config. Running it again keeps existing pins
+  whose URL and ref still match.
+- Run `rulepack packs update` to refresh every Git pin, or
+  `rulepack packs update mstack` to refresh only the named source.
+- Run `rulepack packs list` to see each source's packs, checks, and locked commit.
+  Add `--json` for scripts.
+
+Local sources resolve relative to the config file and need no lock entry.
 
 ## Development
 

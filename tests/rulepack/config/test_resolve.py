@@ -2,7 +2,7 @@ from pathlib import Path
 
 import pytest
 
-from rulepack.config import ConfigError, resolve_config
+from rulepack.config import ConfigError, PathSource, resolve_config
 
 
 def test_config_uses_defaults_when_file_is_missing(git_repository: Path):
@@ -86,3 +86,24 @@ def test_config_is_not_found_when_it_is_above_the_git_root(git_repository: Path)
 
     assert config.file is None
     assert config.values.sgconfig == git_repository / "lint/sgconfig.yml"
+
+
+@pytest.mark.usefixtures("_write_path_source_config")
+def test_config_resolves_a_path_source_against_the_config_when_started_below_it(
+    git_repository: Path,
+):
+
+    config = resolve_config(start=git_repository / "packs")
+
+    assert config.values.sources["team"] == PathSource(
+        path=git_repository / "packs/team"
+    )
+
+
+def test_config_fails_when_a_source_is_not_one_git_ref_or_one_path(
+    git_repository: Path, write_config, invalid_source: str
+):
+    write_config(invalid_source)
+
+    with pytest.raises(ConfigError, match=r"sources\.team"):
+        resolve_config(start=git_repository)
