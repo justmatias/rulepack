@@ -6,6 +6,7 @@ from pathlib import Path
 import pytest
 
 from rulepack.packs import sources
+from tests.rulepack.helpers import init_git_repository
 from tests.rulepack.packs.helpers import (
     publish_source,
     read_head_commit,
@@ -120,3 +121,20 @@ def test_fetch_clone_keeps_the_other_clone_when_a_parallel_run_finished_first(
 
     assert clone == clone_path
     assert [path.name for path in clone.parent.iterdir()] == ["clone.git"]
+
+
+def test_init_writes_the_source_and_the_lock_when_a_source_is_given(
+    tmp_path: Path, source_url: str, run_rulepack
+):
+    repository = tmp_path / "fresh"
+    repository.mkdir()
+    init_git_repository(repository)
+
+    completed = run_rulepack(
+        "init", "--yes", "--source", f"team={source_url}@main",
+        working_directory=repository,
+    )  # fmt: skip
+
+    assert completed.returncode == 0, completed.stderr
+    assert f'git = "{source_url}"' in (repository / ".rulepack.toml").read_text()
+    assert "[sources.team]" in (repository / "rulepack.lock").read_text()
