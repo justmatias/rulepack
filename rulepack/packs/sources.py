@@ -1,0 +1,50 @@
+from pathlib import Path
+
+from rulepack.config import ConfigError, PackSource, ResolvedConfig
+from rulepack.packs.fetch import fetch_commit, resolve_ref
+from rulepack.packs.lock import Lock, LockEntry, read_lock
+
+LOCK_COMMAND = "run `rulepack packs lock`"
+
+
+def find_locked_entry(name: str, source: PackSource, lock: Lock) -> LockEntry:
+    entry = lock.sources.get(name)
+    if entry is None:
+        raise ConfigError(f"source {name!r} is not in the lock; {LOCK_COMMAND}")
+    if (entry.git, entry.ref) != (source.git, source.ref):
+        raise ConfigError(
+            f"source {name!r} changed since it was locked "
+            f"({entry.git}@{entry.ref}); {LOCK_COMMAND}"
+        )
+    return entry
+
+
+def resolve_source_root(name: str, source: PackSource, lock: Lock) -> Path:
+    """The source's folder: the path itself, or the locked commit in the cache."""
+    if source.path is not None:
+        return source.path
+    entry = find_locked_entry(name, source, lock)
+    return fetch_commit(entry.git, entry.commit)
+
+
+def lock_sources(config: ResolvedConfig, update: set[str]) -> Lock:
+    """Pin every git source: keep unchanged pins, re-resolve the ones in `update`."""
+    previous = read_lock(config.lock_file)
+    lock = Lock()
+    for name, source in sorted(config.values.sources.items()):
+        if source.git is None or source.ref is None:
+            continue
+        entry = previous.sources.get(name)
+        is_unchanged = entry is not None and (entry.git, entry.ref) == (
+            source.git,
+            source.ref,
+        )
+        if entry is None or not is_unchanged or name in update:
+            entry = LockEntry(
+                git=source.git,
+                ref=source.ref,
+                commit=resolve_ref(source.git, source.ref),
+            )
+        fetch_commit(entry.git, entry.commit)
+        lock.sources[name] = entry
+    return lock
