@@ -5,14 +5,6 @@ inputs:
   python-version:
     description: 'Python version to set up'
     required: true
-  uv-version:
-    description: 'uv version to install'
-    required: false
-    default: '0.12.3'
-  install-dependencies:
-    description: 'Whether to run uv sync after setup'
-    required: false
-    default: 'true'
 
 runs:
   using: 'composite'
@@ -25,10 +17,9 @@ runs:
     - name: Install uv
       uses: astral-sh/setup-uv@v7
       with:
-        version: ${{ inputs.uv-version }}
+        version: '0.12.3'
         python-version: ${{ inputs.python-version }}
 
     - name: Install dependencies
-      if: inputs.install-dependencies == 'true'
       shell: bash
       run: uv sync --all-groups --frozen
