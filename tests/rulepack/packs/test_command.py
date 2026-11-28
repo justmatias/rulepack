@@ -90,6 +90,19 @@ def test_list_fails_with_the_lock_message_when_the_source_is_not_locked(
     assert "run `rulepack packs lock`" in completed.stderr
 
 
+def test_list_fails_with_the_lock_message_when_the_ref_changed_since_locking(
+    locked_consumer: Path, run_in
+):
+    config = locked_consumer / ".rulepack.toml"
+    config.write_text(config.read_text().replace('ref = "main"', 'ref = "v2"'))
+
+    completed = run_in(locked_consumer, "packs", "list")
+
+    assert completed.returncode == 2
+    assert "changed since it was locked" in completed.stderr
+    assert "run `rulepack packs lock`" in completed.stderr
+
+
 def test_list_fetches_the_locked_commit_when_the_cache_is_cold(
     locked_consumer: Path, cache_directory: Path, run_in
 ):
