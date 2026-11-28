@@ -365,7 +365,11 @@ def main(argv: list[str] | None = None) -> int:
         packs = load_packs(run.config) if {"test", "scan"} & set(steps) else []
         with contextlib.ExitStack() as stack:
             if packs:
-                merged = stack.enter_context(write_merged_sgconfig(run.config, packs))
+                merged = stack.enter_context(
+                    write_merged_sgconfig(
+                        run.config, packs, include_tests="test" in steps
+                    )
+                )
                 run = run.model_copy(update={"merged_sgconfig": merged})
             results = {name: run_step(name, run) for name in steps}
     except (LintError, ConfigError, ChangedFilesError, yaml.YAMLError) as error:
