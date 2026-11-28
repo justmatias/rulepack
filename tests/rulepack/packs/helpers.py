@@ -8,6 +8,15 @@ SAMPLE_CHECKS = SAMPLE_REPOSITORY / "lint"
 BARE_EXCEPT = SAMPLE_REPOSITORY / "invalid" / "error-handling" / "bare_except.py"
 
 
+def write_consumer(repository: Path, source_settings: str) -> None:
+    repository.mkdir()
+    (repository / "target.py").write_bytes(BARE_EXCEPT.read_bytes())
+    (repository / ".rulepack.toml").write_text(
+        'packs = ["team/python-core"]\n\n[sources.team]\n' + source_settings,
+        encoding="utf-8",
+    )
+
+
 def write_source(root: Path, packs: dict[str, list[str]], manifest: str = "") -> None:
     """A source folder: a packs.toml and the sample checks and tests it lists."""
     (root / "lint" / "rules").mkdir(parents=True, exist_ok=True)

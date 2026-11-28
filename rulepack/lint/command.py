@@ -367,7 +367,10 @@ def main(argv: list[str] | None = None) -> int:
             if packs:
                 merged = stack.enter_context(
                     write_merged_sgconfig(
-                        run.config, packs, include_tests="test" in steps
+                        run.config,
+                        packs,
+                        local_sgconfig=find_sgconfig(run),
+                        include_tests="test" in steps,
                     )
                 )
                 run = run.model_copy(update={"merged_sgconfig": merged})

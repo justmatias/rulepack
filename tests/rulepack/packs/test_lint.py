@@ -232,3 +232,58 @@ def test_lint_names_the_file_when_a_pack_rule_test_is_not_a_mapping(
     assert "no-bare-except-test.yml: every rule test must be a mapping" in (
         completed.stderr
     )
+
+
+def test_lint_names_the_file_when_a_pack_rule_test_id_is_a_list(
+    path_consumer: Path, source_work: Path, run_rulepack
+):
+    test = source_work / "lint" / "rule-tests" / "no-bare-except-test.yml"
+    test.write_text("id: [no-bare-except]\n", encoding="utf-8")
+
+    completed = run_rulepack("lint", "--only", "test", working_directory=path_consumer)
+
+    assert completed.returncode == 2
+    assert "no-bare-except-test.yml: every rule test needs a string id" in (
+        completed.stderr
+    )
+
+
+def test_lint_runs_pack_rule_tests_when_the_filename_differs_from_the_id(
+    path_consumer: Path, source_work: Path, run_rulepack
+):
+    tests = source_work / "lint" / "rule-tests"
+    (tests / "no-bare-except-test.yml").rename(tests / "bare-except-cases.yaml")
+
+    completed = run_rulepack(
+        "lint", "--only", "test", "--json", working_directory=path_consumer
+    )
+
+    assert completed.returncode == 0, completed.stderr
+    assert json.loads(completed.stdout)["test"]["skipped"] is None
+
+
+def test_lint_preserves_a_pack_check_id_when_it_is_a_plain_scalar(
+    path_consumer: Path, plain_scalar_check_id: str, scan
+):
+    exit_code, report = scan(path_consumer)
+
+    assert exit_code == 1
+    assert report["scan"]["findings"][0]["rule"] == plain_scalar_check_id
+
+
+def test_lint_runs_a_pack_check_when_only_a_hidden_local_check_matches_its_id(
+    path_consumer: Path, source_work: Path, scan
+):
+    lint_directory = path_consumer / "lint"
+    hidden = lint_directory / "rules" / ".hidden"
+    hidden.mkdir(parents=True)
+    (lint_directory / "sgconfig.yml").write_text(
+        "ruleDirs: [rules]\n", encoding="utf-8"
+    )
+    check = source_work / "lint" / "rules" / "no-bare-except.yml"
+    (hidden / check.name).write_bytes(check.read_bytes())
+
+    exit_code, report = scan(path_consumer)
+
+    assert exit_code == 1
+    assert report["scan"]["findings"][0]["rule"] == "no-bare-except"

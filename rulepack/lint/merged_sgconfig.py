@@ -1,5 +1,6 @@
 import contextlib
 import logging
+import re
 import tempfile
 from collections.abc import Generator
 from pathlib import Path
@@ -8,6 +9,7 @@ from typing import Any
 import yaml
 
 from rulepack.config import ConfigError, PackOverrides, ResolvedConfig, StrictModel
+from rulepack.packs.manifest import resolve_inside
 from rulepack.packs.sources import Pack
 
 logger = logging.getLogger(__name__)
@@ -17,19 +19,71 @@ class PackCheck(StrictModel):
     # `<source>/<pack>`, to name both packs when two define one id.
     pack: str
     document: dict[str, Any]
+    tests_dir: Path
 
 
-def read_local_sgconfig(config: ResolvedConfig) -> dict[str, Any]:
-    """The repo's sgconfig with absolute paths, or an empty one when it has none.
+# ast-grep reads YAML 1.2, where plain `on` and dates are strings.
+AST_GREP_RESOLVERS = {
+    initial: [
+        (tag, pattern)
+        for tag, pattern in resolvers
+        if tag not in {"tag:yaml.org,2002:bool", "tag:yaml.org,2002:timestamp"}
+    ]
+    for initial, resolvers in yaml.SafeLoader.yaml_implicit_resolvers.items()
+}
+for initial in "tTfF":
+    AST_GREP_RESOLVERS[initial].append((
+        "tag:yaml.org,2002:bool",
+        re.compile(r"^(?:true|True|TRUE|false|False|FALSE)$"),
+    ))
 
-    Only the default path may be missing: a repo that sets `sgconfig` expects it.
-    """
-    path = config.values.sgconfig
-    if not path.is_file():
-        if config.sources["sgconfig"] != "default":
-            raise ConfigError(f"no ast-grep config at {path}")
+
+@contextlib.contextmanager
+def open_ast_grep_yaml(path: Path) -> Generator[yaml.SafeLoader, None, None]:
+    loader = yaml.SafeLoader(path.read_text(encoding="utf-8"))
+    loader.yaml_implicit_resolvers = AST_GREP_RESOLVERS
+    try:
+        yield loader
+    finally:
+        loader.dispose()
+
+
+def read_rule_documents(path: Path) -> Generator[Any, None, None]:
+    with open_ast_grep_yaml(path) as loader:
+        while loader.check_node():
+            node = loader.get_node()
+            if isinstance(node, yaml.MappingNode):
+                for key, value in node.value:
+                    if (
+                        isinstance(key, yaml.ScalarNode)
+                        and key.value == "id"
+                        and isinstance(value, yaml.ScalarNode)
+                        and value.tag != "tag:yaml.org,2002:null"
+                    ):
+                        value.tag = "tag:yaml.org,2002:str"
+            yield loader.construct_document(node)
+
+
+def list_rule_yaml(directory: Path) -> list[Path]:
+    return sorted(
+        path
+        for path in directory.rglob("*")
+        if path.suffix in {".yml", ".yaml"}
+        and not any(part.startswith(".") for part in path.relative_to(directory).parts)
+        and path.is_file()
+    )
+
+
+def read_local_sgconfig(path: Path | None) -> dict[str, Any]:
+    """The repo's sgconfig with absolute paths, or an empty one when it has none."""
+    if path is None:
         return {}
-    data = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
+    with open_ast_grep_yaml(path) as loader:
+        data = loader.get_single_data()
+    if data is None:
+        return {}
+    if not isinstance(data, dict):
+        raise ConfigError(f"{path}: the ast-grep config must be a mapping")
     for key in ("ruleDirs", "utilDirs"):
         if key in data:
             data[key] = [str(path.parent / directory) for directory in data[key]]
@@ -44,9 +98,9 @@ def collect_local_check_ids(data: dict[str, Any]) -> set[str]:
     return {
         entry["id"]
         for directory in data.get("ruleDirs", [])
-        for path in Path(directory).rglob("*.y*ml")
-        for entry in yaml.safe_load_all(path.read_text(encoding="utf-8"))
-        if entry and "id" in entry
+        for path in list_rule_yaml(Path(directory))
+        for entry in read_rule_documents(path)
+        if isinstance(entry, dict) and isinstance(entry.get("id"), str)
     }
 
 
@@ -56,7 +110,7 @@ def collect_pack_checks(packs: list[Pack]) -> dict[str, PackCheck]:
     for pack in packs:
         qualified = f"{pack.source}/{pack.name}"
         for path in pack.checks:
-            for document in yaml.safe_load_all(path.read_text(encoding="utf-8")):
+            for document in read_rule_documents(path):
                 if document is None:
                     continue
                 check_id = document.get("id") if isinstance(document, dict) else None
@@ -69,7 +123,9 @@ def collect_pack_checks(packs: list[Pack]) -> dict[str, PackCheck]:
                         f"check {check_id!r} is in pack {checks[check_id].pack!r} "
                         f"and in pack {qualified!r}; select only one of them"
                     )
-                checks[check_id] = PackCheck(pack=qualified, document=document)
+                checks[check_id] = PackCheck(
+                    pack=qualified, document=document, tests_dir=pack.tests_dir
+                )
     return checks
 
 
@@ -102,27 +158,51 @@ def write_pack_checks(
         )
 
 
-def write_pack_tests(directory: Path, packs: list[Pack], selected: set[str]) -> None:
+def write_pack_tests(
+    directory: Path, checks: dict[str, PackCheck], selected: set[str]
+) -> None:
     directory.mkdir()
-    tests = sorted({test for pack in packs for test in pack.tests})
-    for index, path in enumerate(tests):
-        documents = [
-            document
-            for document in yaml.safe_load_all(path.read_text(encoding="utf-8"))
-            if document is not None
-        ]
-        if not all(isinstance(document, dict) for document in documents):
-            raise ConfigError(f"{path}: every rule test must be a mapping")
-        cases = [case for case in documents if case.get("id") in selected]
-        if cases:
-            (directory / f"{index}.yml").write_text(
-                yaml.safe_dump_all(cases), encoding="utf-8"
+    check_ids_by_directory: dict[Path, set[str]] = {}
+    for check_id in selected:
+        check_ids_by_directory.setdefault(checks[check_id].tests_dir, set()).add(
+            check_id
+        )
+    index = 0
+    for tests_dir, check_ids in sorted(check_ids_by_directory.items()):
+        for path in list_rule_yaml(tests_dir):
+            resolved = resolve_inside(
+                tests_dir, path.relative_to(tests_dir), "rule test"
             )
+            cases = read_pack_test_cases(resolved, check_ids)
+            if cases:
+                (directory / f"{index}.yml").write_text(
+                    yaml.safe_dump_all(cases), encoding="utf-8"
+                )
+                index += 1
+
+
+def read_pack_test_cases(path: Path, check_ids: set[str]) -> list[dict[str, Any]]:
+    cases: list[dict[str, Any]] = []
+    for document in read_rule_documents(path):
+        if document is None:
+            continue
+        if not isinstance(document, dict):
+            raise ConfigError(f"{path}: every rule test must be a mapping")
+        check_id = document.get("id")
+        if not isinstance(check_id, str):
+            raise ConfigError(f"{path}: every rule test needs a string id")
+        if check_id in check_ids:
+            cases.append(document)
+    return cases
 
 
 @contextlib.contextmanager
 def write_merged_sgconfig(
-    config: ResolvedConfig, packs: list[Pack], *, include_tests: bool
+    config: ResolvedConfig,
+    packs: list[Pack],
+    *,
+    local_sgconfig: Path | None,
+    include_tests: bool,
 ) -> Generator[Path, None, None]:
     """A temporary sgconfig with the repo's checks and the packs' checks.
 
@@ -131,7 +211,7 @@ def write_merged_sgconfig(
     """
     with tempfile.TemporaryDirectory(prefix="rulepack-packs-") as directory:
         root = Path(directory)
-        data = read_local_sgconfig(config)
+        data = read_local_sgconfig(local_sgconfig)
         checks = collect_pack_checks(packs)
         overrides = config.values.pack_overrides
         selected = select_pack_check_ids(
@@ -140,7 +220,7 @@ def write_merged_sgconfig(
         write_pack_checks(root / "rules", checks, selected, overrides)
         data["ruleDirs"] = [*data.get("ruleDirs", []), str(root / "rules")]
         if include_tests:
-            write_pack_tests(root / "tests", packs, selected)
+            write_pack_tests(root / "tests", checks, selected)
             data["testConfigs"] = [
                 *(data.get("testConfigs") or []),
                 {"testDir": str(root / "tests")},

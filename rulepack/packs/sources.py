@@ -9,7 +9,7 @@ from rulepack.config import (
 )
 from rulepack.packs.fetch import fetch_commit, resolve_ref
 from rulepack.packs.lock import Lock, LockEntry, read_lock
-from rulepack.packs.manifest import Manifest, load_manifest, resolve_inside
+from rulepack.packs.manifest import Manifest, load_manifest
 
 LOCK_COMMAND = "run `rulepack packs lock`"
 
@@ -18,7 +18,7 @@ class Pack(StrictModel):
     source: str
     name: str
     checks: list[Path]
-    tests: list[Path]
+    tests_dir: Path
 
 
 def find_locked_entry(name: str, source: GitSource, lock: Lock) -> LockEntry:
@@ -79,14 +79,7 @@ def build_pack(source: str, name: str, manifest: Manifest) -> Pack:
     for path in checks:
         if not path.is_file():
             raise ConfigError(f"pack '{source}/{name}' is missing {path}")
-    tests = [
-        resolve_inside(
-            manifest.tests_dir, Path(f"{check}-test.yml"), f"test of {check!r}"
-        )
-        for check in manifest.packs[name].checks
-        if (manifest.tests_dir / f"{check}-test.yml").is_file()
-    ]
-    return Pack(source=source, name=name, checks=checks, tests=tests)
+    return Pack(source=source, name=name, checks=checks, tests_dir=manifest.tests_dir)
 
 
 def group_selected_packs(config: ResolvedConfig) -> dict[str, list[str]]:

@@ -6,7 +6,7 @@ import pytest
 
 from rulepack.packs.fetch import retry_after_making_writable
 from tests.rulepack.helpers import init_git_repository, run_git
-from tests.rulepack.packs.helpers import BARE_EXCEPT, publish_source, write_source
+from tests.rulepack.packs.helpers import publish_source, write_consumer, write_source
 
 
 @pytest.fixture(autouse=True)
@@ -35,13 +35,7 @@ def source_url(tmp_path: Path, source_work: Path) -> str:
 def consumer(tmp_path: Path, source_url: str) -> Path:
     """A git repo with a bare except, selecting team/python-core from a git source."""
     repository = tmp_path / "consumer"
-    repository.mkdir()
-    (repository / "target.py").write_bytes(BARE_EXCEPT.read_bytes())
-    (repository / ".rulepack.toml").write_text(
-        'packs = ["team/python-core"]\n\n'
-        f'[sources.team]\ngit = "{source_url}"\nref = "main"\n',
-        encoding="utf-8",
-    )
+    write_consumer(repository, f'git = "{source_url}"\nref = "main"\n')
     return init_git_repository(repository)
 
 
@@ -79,13 +73,7 @@ def _push_new_source_commit(
 def path_consumer(tmp_path: Path, source_work: Path) -> Path:
     """A folder, not a git repo, selecting team/python-core from a path source."""
     repository = tmp_path / "local"
-    repository.mkdir()
-    (repository / "target.py").write_bytes(BARE_EXCEPT.read_bytes())
-    (repository / ".rulepack.toml").write_text(
-        'packs = ["team/python-core"]\n\n'
-        f'[sources.team]\npath = "{source_work.as_posix()}"\n',
-        encoding="utf-8",
-    )
+    write_consumer(repository, f'path = "{source_work.as_posix()}"\n')
     return repository
 
 
@@ -164,3 +152,16 @@ def _break_pack_rule_tests(source_work: Path) -> None:
 def _write_pack_rule_test_as_a_list(source_work: Path) -> None:
     test = source_work / "lint" / "rule-tests" / "no-bare-except-test.yml"
     test.write_text("- id: no-bare-except\n", encoding="utf-8")
+
+
+@pytest.fixture(params=["on", "0123", "false"])
+def plain_scalar_check_id(request: pytest.FixtureRequest, source_work: Path) -> str:
+    check_id = request.param
+    check = source_work / "lint" / "rules" / "no-bare-except.yml"
+    check.write_text(
+        check.read_text(encoding="utf-8").replace(
+            "id: no-bare-except", f"id: {check_id}"
+        ),
+        encoding="utf-8",
+    )
+    return check_id
