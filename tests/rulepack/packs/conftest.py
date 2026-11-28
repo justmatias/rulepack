@@ -3,7 +3,7 @@ from pathlib import Path
 
 import pytest
 
-from tests.rulepack.helpers import init_git_repository
+from tests.rulepack.helpers import init_git_repository, run_git
 from tests.rulepack.packs.helpers import publish_source, write_source
 
 
@@ -79,3 +79,21 @@ def path_consumer(tmp_path: Path, source_work: Path) -> Path:
         f'[sources.team]\npath = "{source_work.as_posix()}"\n', encoding="utf-8"
     )
     return repository
+
+
+@pytest.fixture
+def _rewrite_source_history(
+    tmp_path: Path,
+    source_work: Path,
+    lock_text: str,  # pylint: disable=unused-argument  # the lock pins the old head first
+) -> None:
+    """Force-push main to a new root commit, so no ref points at the locked one.
+
+    The cache's partial clone still gets the locked commit: git fetches a missing
+    object from the server by its id.
+    """
+    run_git(source_work, "checkout", "--quiet", "--orphan", "rewritten")
+    run_git(source_work, "commit", "--quiet", "-m", "rewritten")
+    run_git(source_work, "push", "--quiet", "--force", "origin", "rewritten:main")
+    # Otherwise a clone gets the old pack whole, unreachable commit included.
+    run_git(tmp_path / "source.git", "config", "pack.allowPackReuse", "false")

@@ -1,4 +1,5 @@
 import json
+import tomllib
 import shutil
 from pathlib import Path
 
@@ -144,6 +145,21 @@ def test_fetch_clone_keeps_the_other_clone_when_a_parallel_run_finished_first(
 
 def test_lock_writes_lf_line_endings_when_run_on_any_platform(locked_consumer: Path):
     assert b"\r" not in (locked_consumer / "rulepack.lock").read_bytes()
+
+
+@pytest.mark.usefixtures("_rewrite_source_history")
+def test_list_fetches_the_locked_commit_when_no_ref_points_at_it(
+    locked_consumer: Path, cache_directory: Path, source_url: str, run_in
+):
+    locked = tomllib.loads((locked_consumer / "rulepack.lock").read_text())
+    shutil.rmtree(cache_directory, onexc=fetch.retry_after_making_writable)
+
+    completed = run_in(locked_consumer, "packs", "list", "--json")
+
+    assert completed.returncode == 0, completed.stderr
+    team = json.loads(completed.stdout)["team"]
+    assert team["commit"] == locked["sources"]["team"]["commit"]
+    assert "python-core" in team["packs"]
 
 
 def test_list_reports_no_commit_when_a_locked_source_became_a_path(
