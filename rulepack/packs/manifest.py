@@ -18,11 +18,13 @@ class Manifest(StrictModel):
     packs: dict[str, ManifestPack] = Field(default_factory=dict)
 
 
-def resolve_inside(root: Path, relative: Path, what: str) -> Path:
+def resolve_inside(root: Path, relative: Path, field_label: str) -> Path:
     """`root / relative`, which must not leave `root`."""
     path = (root / relative).resolve()
     if not path.is_relative_to(root.resolve()):
-        raise ConfigError(f"{root / MANIFEST_FILE_NAME}: {what} escapes the source")
+        raise ConfigError(
+            f"{root / MANIFEST_FILE_NAME}: {field_label} escapes the source"
+        )
     return path
 
 

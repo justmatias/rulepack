@@ -5,7 +5,7 @@ from pathlib import Path
 import tomli_w
 from pydantic import Field, ValidationError
 
-from rulepack.config import ConfigError, StrictModel
+from rulepack.config import ConfigError, GitSource, StrictModel
 
 LOCK_HEADER = "# Written by `rulepack packs lock`. Commit this file.\n\n"
 
@@ -14,6 +14,10 @@ class LockEntry(StrictModel):
     git: str
     ref: str
     commit: str
+
+    def matches(self, source: GitSource) -> bool:
+        """Whether this pin was made for the source's current git URL and ref."""
+        return (self.git, self.ref) == (source.git, source.ref)
 
 
 class Lock(StrictModel):

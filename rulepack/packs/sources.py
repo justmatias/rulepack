@@ -11,7 +11,7 @@ def find_locked_entry(name: str, source: GitSource, lock: Lock) -> LockEntry:
     entry = lock.sources.get(name)
     if entry is None:
         raise ConfigError(f"source {name!r} is not in the lock; {LOCK_COMMAND}")
-    if (entry.git, entry.ref) != (source.git, source.ref):
+    if not entry.matches(source):
         raise ConfigError(
             f"source {name!r} changed since it was locked "
             f"({entry.git}@{entry.ref}); {LOCK_COMMAND}"
@@ -35,11 +35,7 @@ def lock_sources(config: ResolvedConfig, update: set[str]) -> Lock:
         if not isinstance(source, GitSource):
             continue
         entry = previous.sources.get(name)
-        is_unchanged = entry is not None and (entry.git, entry.ref) == (
-            source.git,
-            source.ref,
-        )
-        if entry is None or not is_unchanged or name in update:
+        if entry is None or not entry.matches(source) or name in update:
             entry = LockEntry(
                 git=source.git,
                 ref=source.ref,

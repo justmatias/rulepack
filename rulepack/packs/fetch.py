@@ -36,6 +36,19 @@ def retry_after_making_writable(
     function(path)
 
 
+def move_into_place(pending: Path, final: Path) -> None:
+    """Rename `pending` to `final`, or drop it when a parallel run got there first.
+
+    pre-commit runs hooks in parallel, so two runs can fetch the same thing at once.
+    """
+    try:
+        pending.replace(final)
+    except OSError:
+        shutil.rmtree(pending, onexc=retry_after_making_writable)
+        if not final.is_dir():
+            raise
+
+
 def fetch_clone(url: str) -> Path:
     """A blob-less bare clone of the source with every branch and tag, up to date."""
     clone = locate_cache_directory(url) / "clone.git"
@@ -43,13 +56,7 @@ def fetch_clone(url: str) -> Path:
         clone.parent.mkdir(parents=True, exist_ok=True)
         pending = Path(tempfile.mkdtemp(dir=clone.parent, prefix="clone-"))
         run_git("clone", "--quiet", "--bare", "--filter=blob:none", url, str(pending))
-        try:
-            pending.replace(clone)
-        except OSError:
-            # A parallel run (pre-commit runs hooks in parallel) cloned it first.
-            shutil.rmtree(pending, onexc=retry_after_making_writable)
-            if not clone.is_dir():
-                raise
+        move_into_place(pending, clone)
         return clone
     run_git(
         "fetch", "--quiet", "--prune", "--filter=blob:none", "origin",
@@ -82,10 +89,5 @@ def fetch_commit(url: str, commit: str) -> Path:
     pending = Path(tempfile.mkdtemp(dir=final.parent, prefix="commit-"))
     with tarfile.open(fileobj=io.BytesIO(archive)) as tar:
         tar.extractall(pending, filter="data")
-    try:
-        pending.replace(final)
-    except OSError:
-        shutil.rmtree(pending)
-        if not final.is_dir():
-            raise
+    move_into_place(pending, final)
     return final

@@ -32,12 +32,15 @@ def describe_sources(config: ResolvedConfig) -> dict[str, SourceDescription]:
     for name, source in sorted(config.values.sources.items()):
         manifest = load_manifest(resolve_source_root(name, source, lock))
         entry = lock.sources.get(name)
+        # A source that became a path keeps its old lock entry until relocked.
+        locked_commit = (
+            entry.commit
+            if entry is not None and isinstance(source, GitSource)
+            else None
+        )
         described[name] = SourceDescription(
             **source.model_dump(mode="json"),
-            # A source that became a path keeps its old lock entry until relocked.
-            commit=entry.commit
-            if entry is not None and isinstance(source, GitSource)
-            else None,
+            commit=locked_commit,
             packs={
                 pack: list(manifest.packs[pack].checks)
                 for pack in sorted(manifest.packs)
