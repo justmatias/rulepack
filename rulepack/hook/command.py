@@ -117,8 +117,10 @@ def find_edited_file_findings(
     root: Path, edited: list[Path], started: float
 ) -> list[str]:
     config = resolve_hook_config(root)
-    files = select_files(config, edited) if config else []
-    if config is None or not files:
+    if config is None:
+        return []
+    files = select_files(config, edited)
+    if not files:
         return []
     arguments = ["--files", *[str(path) for path in files], "--only", "scan"]
     return lint_within_budget(config, arguments, started)
